@@ -1,19 +1,32 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/utils/supabase/client";
-import { useAuthStore } from "@/stores/authStore";
-import { ReportLayout } from "@/components/reports/ReportLayout";
-import { ReportFilters, ReportFilterValues } from "@/components/reports/ReportFilters";
-import { useReportStations, defaultFilterValues } from "@/hooks/useReportStations";
-import { formatCurrency } from "@/lib/utils";
-import { exportCsv } from "@/lib/exportCsv";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/common/LoadingSpinner";
+import {
+  ReportFilters,
+  ReportFilterValues,
+} from "@/components/reports/ReportFilters";
+import { ReportLayout } from "@/components/reports/ReportLayout";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  defaultFilterValues,
+  useReportStations,
+} from "@/hooks/useReportStations";
+import { exportCsv } from "@/lib/exportCsv";
+import { formatCurrency } from "@/lib/utils";
+import { useAuthStore } from "@/stores/authStore";
+import { createClient } from "@/utils/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { Search } from "lucide-react";
+import { useState } from "react";
 
 const supabase = createClient();
 
@@ -31,7 +44,9 @@ interface StockArticle {
 
 export function StockBoutiqueReport() {
   const { entreprise } = useAuthStore();
-  const [filters, setFilters] = useState<ReportFilterValues>(defaultFilterValues());
+  const [filters, setFilters] = useState<ReportFilterValues>(
+    defaultFilterValues(),
+  );
   const [search, setSearch] = useState("");
   const { data: stations = [] } = useReportStations();
 
@@ -39,11 +54,15 @@ export function StockBoutiqueReport() {
     queryKey: ["report-stock-boutique", filters.stationId, entreprise?.id],
     queryFn: async () => {
       if (!entreprise || !stations.length) return [];
-      const stationFilter = filters.stationId ? [filters.stationId] : stations.map(s => s.id);
+      const stationFilter = filters.stationId
+        ? [filters.stationId]
+        : stations.map((s) => s.id);
 
       const { data, error } = await supabase
         .from("stocks_boutique")
-        .select("id, article_id, station_id, quantite, cmup, articles(nom, categories_articles(nom))")
+        .select(
+          "id, article_id, station_id, quantite, cmup, articles(nom, categories_articles(nom))",
+        )
         .in("station_id", stationFilter)
         .gt("quantite", 0)
         .order("article_id");
@@ -56,13 +75,17 @@ export function StockBoutiqueReport() {
         .in("station_id", stationFilter);
 
       const seuilMap: Record<string, number> = {};
-      for (const s of (seuils ?? [])) {
-        seuilMap[`${s.station_id}_${s.article_id}`] = (s.seuil_minimum as number) ?? 0;
+      for (const s of seuils ?? []) {
+        seuilMap[`${s.station_id}_${s.article_id}`] =
+          (s.seuil_minimum as number) ?? 0;
       }
 
-      return (data ?? []).map(s => {
+      return (data ?? []).map((s) => {
         const r = s as Record<string, unknown>;
-        const article = r.articles as { nom: string; categories_articles: { nom: string } | null } | null;
+        const article = r.articles as {
+          nom: string;
+          categories_articles: { nom: string } | null;
+        } | null;
         const qtie = (r.quantite as number) ?? 0;
         const cmup = (r.cmup as number) ?? 0;
         const seuilKey = `${r.station_id}_${r.article_id}`;
@@ -71,7 +94,9 @@ export function StockBoutiqueReport() {
           id: r.id as string,
           article_nom: article?.nom ?? "—",
           categorie: article?.categories_articles?.nom ?? "—",
-          station_nom: stations.find(st => st.id === (r.station_id as string))?.nom ?? "—",
+          station_nom:
+            stations.find((st) => st.id === (r.station_id as string))?.nom ??
+            "—",
           quantite: qtie,
           cmup,
           valeur: qtie * cmup,
@@ -84,40 +109,56 @@ export function StockBoutiqueReport() {
     staleTime: 3 * 60 * 1000,
   });
 
-  const filtered = rows.filter(r =>
-    r.article_nom.toLowerCase().includes(search.toLowerCase()) ||
-    r.categorie.toLowerCase().includes(search.toLowerCase())
+  const filtered = rows.filter(
+    (r) =>
+      r.article_nom.toLowerCase().includes(search.toLowerCase()) ||
+      r.categorie.toLowerCase().includes(search.toLowerCase()),
   );
 
   const valeurTotale = filtered.reduce((a, r) => a + r.valeur, 0);
-  const nbAlertes = filtered.filter(r => r.alerte).length;
+  const nbAlertes = filtered.filter((r) => r.alerte).length;
 
   function handleExport() {
-    exportCsv(filtered.map(r => ({
-      Station: r.station_nom,
-      Article: r.article_nom,
-      Catégorie: r.categorie,
-      Quantité: r.quantite,
-      "CMUP (Ar)": r.cmup,
-      "Valeur (Ar)": r.valeur,
-      "Seuil min": r.seuil_min ?? "",
-      Alerte: r.alerte ? "Oui" : "Non",
-    })), `stock-boutique-${new Date().toISOString().split("T")[0]}`);
+    exportCsv(
+      filtered.map((r) => ({
+        Station: r.station_nom,
+        Article: r.article_nom,
+        Catégorie: r.categorie,
+        Quantité: r.quantite,
+        "CMUP (Ar)": r.cmup,
+        "Valeur (Ar)": r.valeur,
+        "Seuil min": r.seuil_min ?? "",
+        Alerte: r.alerte ? "Oui" : "Non",
+      })),
+      `stock-boutique-${new Date().toISOString().split("T")[0]}`,
+    );
   }
 
   return (
-    <ReportLayout title="Stock boutique" description="État des stocks valorisés au CMUP" onExport={handleExport}>
+    <ReportLayout
+      title="Stock boutique"
+      description="État des stocks valorisés au CMUP"
+      onExport={handleExport}
+    >
       <div className="mt-4 space-y-4">
-        <ReportFilters stations={stations} values={filters} onChange={setFilters} />
+        <ReportFilters
+          stations={stations}
+          values={filters}
+          onChange={setFilters}
+        />
 
         <div className="flex flex-wrap items-center gap-4">
           <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2 text-sm">
             <span className="text-muted-foreground">Valeur totale :</span>{" "}
-            <span className="font-semibold text-emerald-700">{formatCurrency(valeurTotale)}</span>
+            <span className="font-semibold text-emerald-700">
+              {formatCurrency(valeurTotale)}
+            </span>
           </div>
           {nbAlertes > 0 && (
             <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2 text-sm">
-              <span className="text-red-700 font-semibold">{nbAlertes} article(s) sous seuil d'alerte</span>
+              <span className="text-red-700 font-semibold">
+                {nbAlertes} article(s) sous seuil d&apos;alerte
+              </span>
             </div>
           )}
           <div className="relative flex-1 max-w-xs ml-auto">
@@ -125,13 +166,15 @@ export function StockBoutiqueReport() {
             <Input
               placeholder="Rechercher un article..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={(e) => setSearch(e.target.value)}
               className="pl-8 h-8 text-xs"
             />
           </div>
         </div>
 
-        {isLoading ? <PageLoading /> : (
+        {isLoading ? (
+          <PageLoading />
+        ) : (
           <div className="rounded-md border overflow-x-auto">
             <Table>
               <TableHeader>
@@ -148,27 +191,49 @@ export function StockBoutiqueReport() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-10">
+                    <TableCell
+                      colSpan={7}
+                      className="text-center text-muted-foreground py-10"
+                    >
                       Aucun article en stock
                     </TableCell>
                   </TableRow>
-                ) : filtered.map(r => (
-                  <TableRow key={r.id} className={r.alerte ? "bg-red-50/50" : undefined}>
-                    <TableCell className="text-sm">{r.station_nom}</TableCell>
-                    <TableCell className="text-sm font-medium">{r.article_nom}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{r.categorie}</TableCell>
-                    <TableCell className="text-right text-sm">{r.quantite.toLocaleString("fr-FR")}</TableCell>
-                    <TableCell className="text-right text-sm">{r.cmup.toLocaleString("fr-FR")}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">{formatCurrency(r.valeur)}</TableCell>
-                    <TableCell>
-                      {r.alerte ? (
-                        <Badge variant="destructive" className="text-xs">Alerte</Badge>
-                      ) : (
-                        <Badge variant="secondary" className="text-xs">OK</Badge>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                ) : (
+                  filtered.map((r) => (
+                    <TableRow
+                      key={r.id}
+                      className={r.alerte ? "bg-red-50/50" : undefined}
+                    >
+                      <TableCell className="text-sm">{r.station_nom}</TableCell>
+                      <TableCell className="text-sm font-medium">
+                        {r.article_nom}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.categorie}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.quantite.toLocaleString("fr-FR")}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {r.cmup.toLocaleString("fr-FR")}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {formatCurrency(r.valeur)}
+                      </TableCell>
+                      <TableCell>
+                        {r.alerte ? (
+                          <Badge variant="destructive" className="text-xs">
+                            Alerte
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            OK
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

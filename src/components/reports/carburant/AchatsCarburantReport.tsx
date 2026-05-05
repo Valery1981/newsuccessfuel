@@ -44,7 +44,7 @@ export function AchatsCarburantReport() {
     queryFn: async () => {
       if (!entreprise) return [];
 
-      let query = supabase
+      const query = supabase
         .from("achats_carburant")
         .select("id, date_commande, numero_bc, fournisseur_id, montant_facture, statut, tiers(nom), lignes_bc_carburant(type_carburant, quantite_commandee, station_id)")
         .eq("entreprise_id", entreprise.id)

@@ -59,7 +59,7 @@ export function WaitingValidationPage() {
         </CardTitle>
         <p className="text-slate-300 text-sm mt-2">
           Votre station est en attente de validation par votre partenaire
-          pétrolier ou l'administrateur SuccessFuel.
+          pétrolier ou l&apos;administrateur SuccessFuel.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -1,3 +1,4 @@
+import type { AccountsBundle } from "@/components/manager/initialisation/CompanyInitialisationPage";
 import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
@@ -173,7 +174,7 @@ export const initialisationService = {
     };
   },
 
-  async getOpeningBalanceSummary() {
+  async getOpeningBalanceSummary(_entrepriseId: string) {
     // This RPC function may not exist yet - return empty structure for now
     // TODO: Implement compute_opening_balance_summary RPC in Supabase
     return {
@@ -181,10 +182,18 @@ export const initialisationService = {
       receivable: 0,
       payable: 0,
       fixed_assets: 0,
+      fuel: 0,
+      boutique: 0,
+      asset: 0,
+      totalActif: 0,
+      totalPassif: 0,
+      capitalNet: 0,
     };
   },
 
-  async getInitialisationAccountsBundle(entrepriseId: string) {
+  async getInitialisationAccountsBundle(
+    entrepriseId: string,
+  ): Promise<AccountsBundle> {
     const [treasury, receivable, payable, fixedAssets] = await Promise.all([
       supabase
         .from("tresoreries")
@@ -193,28 +202,50 @@ export const initialisationService = {
         .eq("is_active", true),
       supabase
         .from("tiers")
-        .select("id, compte_principal as account_id, nom as label, type")
+        .select("id, compte_principal, nom, type")
         .eq("entreprise_id", entrepriseId)
         .eq("is_active", true)
         .in("type", ["client", "employe"]),
       supabase
         .from("tiers")
-        .select("id, compte_principal as account_id, nom as label, type")
+        .select("id, compte_principal, nom, type")
         .eq("entreprise_id", entrepriseId)
         .eq("is_active", true)
         .in("type", ["fournisseur"]),
       supabase
         .from("plan_comptable_standard")
-        .select("numero as account_id, libelle as label")
+        .select("numero, libelle")
         .gte("numero", "200")
         .lt("numero", "300"),
     ]);
 
     return {
-      treasury: treasury.data ?? [],
-      receivable: receivable.data ?? [],
-      payable: payable.data ?? [],
-      fixed_assets: fixedAssets.data ?? [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      treasury: (treasury.data ?? []).map((t: any) => ({
+        id: t.id,
+        numero_compte: t.numero_compte,
+        libelle: t.libelle,
+        solde_actuel: t.solde_actuel,
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      receivable: (receivable.data ?? []).map((t: any) => ({
+        id: t.id,
+        account_id: t.compte_principal,
+        label: t.nom,
+        type: t.type,
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      payable: (payable.data ?? []).map((t: any) => ({
+        id: t.id,
+        account_id: t.compte_principal,
+        label: t.nom,
+        type: t.type,
+      })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      fixed_assets: (fixedAssets.data ?? []).map((a: any) => ({
+        account_id: a.numero,
+        label: a.libelle,
+      })),
     };
   },
 

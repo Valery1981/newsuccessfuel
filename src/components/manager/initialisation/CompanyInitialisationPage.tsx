@@ -53,16 +53,30 @@ interface TiersAccount {
   type: string;
 }
 
+interface TreasuryAccount {
+  id: string;
+  numero_compte: string;
+  libelle: string;
+  solde_actuel: number | null;
+}
+
 interface FixedAssetAccount {
   account_id: string;
   label: string;
 }
 
-interface AccountsBundle {
+export interface AccountsBundle {
   treasury: TreasuryAccount[];
   receivable: TiersAccount[];
   payable: TiersAccount[];
   fixed_assets: FixedAssetAccount[];
+}
+
+interface BoutiqueInitItem {
+  product_id: string;
+  product_name: string;
+  family_name: string;
+  purchase_price: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
@@ -113,20 +127,19 @@ export function CompanyInitialisationPage() {
     queryKey: ["boutique-init", selectedStation, entreprise?.id],
     queryFn: () =>
       selectedStation && entreprise
-        ? initialisationService.getBoutiqueInitItems(
-            selectedStation,
-            entreprise.id,
-          )<BoutiqueInitItem[]>
+        ? initialisationService.getBoutiqueInitItems(selectedStation)
         : [],
     enabled: !!selectedStation && !!entreprise?.id,
   });
 
   const { data: accountsBundle } = useQuery<AccountsBundle | null>({
     queryKey: ["accounts-bundle", entreprise?.id],
-    queryFn: () =>
-      entreprise
-        ? initialisationService.getInitialisationAccountsBundle(entreprise.id)
-        : null,
+    queryFn: async () => {
+      if (!entreprise) return null;
+      return initialisationService.getInitialisationAccountsBundle(
+        entreprise.id,
+      );
+    },
     enabled: !!entreprise?.id,
   });
 
@@ -782,7 +795,7 @@ export function CompanyInitialisationPage() {
                   l&apos;entreprise (toutes les stations).
                 </p>
               </div>
-              {(accountsBundle?.receivable ?? []).map((r) => (
+              {(accountsBundle?.receivable ?? []).map((r: TiersAccount) => (
                 <div
                   key={r.id}
                   className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
@@ -838,7 +851,7 @@ export function CompanyInitialisationPage() {
                   l&apos;entreprise (toutes les stations).
                 </p>
               </div>
-              {(accountsBundle?.payable ?? []).map((p) => (
+              {(accountsBundle?.payable ?? []).map((p: TiersAccount) => (
                 <div
                   key={p.id}
                   className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
@@ -894,34 +907,36 @@ export function CompanyInitialisationPage() {
                   l&apos;entreprise (toutes les stations).
                 </p>
               </div>
-              {(accountsBundle?.fixed_assets ?? []).map((a) => (
-                <div
-                  key={a.account_id}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
-                >
-                  <div className="sm:col-span-2">
-                    <p className="font-medium">{a.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Compte: {a.account_id}
-                    </p>
+              {(accountsBundle?.fixed_assets ?? []).map(
+                (a: FixedAssetAccount) => (
+                  <div
+                    key={a.account_id}
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                  >
+                    <div className="sm:col-span-2">
+                      <p className="font-medium">{a.label}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Compte: {a.account_id}
+                      </p>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Valeur initiale (MGA)</Label>
+                      <Input
+                        type="number"
+                        value={immobilisations[a.account_id] || ""}
+                        onChange={(e) =>
+                          setImmobilisations((prev) => ({
+                            ...prev,
+                            [a.account_id]: e.target.value,
+                          }))
+                        }
+                        placeholder="0"
+                        min={0}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Valeur initiale (MGA)</Label>
-                    <Input
-                      type="number"
-                      value={immobilisations[a.account_id] || ""}
-                      onChange={(e) =>
-                        setImmobilisations((prev) => ({
-                          ...prev,
-                          [a.account_id]: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              ))}
+                ),
+              )}
               <Button
                 onClick={() => saveComptesMutation.mutate("immobilisations")}
                 disabled={saveComptesMutation.isPending}
