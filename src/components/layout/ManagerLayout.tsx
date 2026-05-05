@@ -1,0 +1,673 @@
+"use client";
+
+import { NotificationCenter } from "@/components/messaging/NotificationCenter";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useAuth } from "@/hooks/useAuth";
+import { cn } from "@/lib/utils";
+import {
+  AlertCircle,
+  BarChart3,
+  Bell,
+  Building2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
+  Fuel,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  Settings,
+  ShoppingCart,
+  Users,
+  Wrench,
+} from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: React.ComponentType<{
+    className?: string;
+    style?: React.CSSProperties;
+  }>;
+  children?: NavItem[];
+  badge?: number;
+  badgeVariant?: "danger" | "warning";
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+const navSections: NavSection[] = [
+  {
+    label: "",
+    items: [
+      {
+        href: "/manager/dashboard",
+        label: "Tableau de bord",
+        icon: LayoutDashboard,
+      },
+      { href: "/manager/stations", label: "Mes stations", icon: Fuel },
+    ],
+  },
+  {
+    label: "Gestion",
+    items: [
+      {
+        href: "/manager/structure",
+        label: "Structure",
+        icon: Settings,
+        children: [
+          {
+            href: "/manager/structure/comptes",
+            label: "Plan comptable",
+            icon: ClipboardList,
+          },
+          { href: "/manager/structure/tiers", label: "Tiers", icon: Users },
+          {
+            href: "/manager/structure/articles",
+            label: "Articles / Produits",
+            icon: Package,
+          },
+          {
+            href: "/manager/structure/carburants",
+            label: "Carburants",
+            icon: Fuel,
+          },
+          {
+            href: "/manager/structure/tresorerie",
+            label: "Trésorerie",
+            icon: ShoppingCart,
+          },
+          {
+            href: "/manager/structure/camions",
+            label: "Camions",
+            icon: Building2,
+          },
+          {
+            href: "/manager/structure/services",
+            label: "Services",
+            icon: Wrench,
+          },
+          {
+            href: "/manager/structure/objectifs",
+            label: "Objectifs & Seuils",
+            icon: BarChart3,
+          },
+        ],
+      },
+      {
+        href: "/manager/initialisation",
+        label: "Initialisation",
+        icon: ClipboardList,
+      },
+      {
+        href: "/manager/traitement",
+        label: "Traitement",
+        icon: ShoppingCart,
+        children: [
+          {
+            href: "/manager/traitement/achat-carburant",
+            label: "Achat Carburant",
+            icon: Fuel,
+          },
+          {
+            href: "/manager/traitement/vente-carburant",
+            label: "Vente Carburant",
+            icon: Fuel,
+          },
+          {
+            href: "/manager/traitement/achat-boutique",
+            label: "Achat Boutique",
+            icon: Package,
+          },
+          {
+            href: "/manager/traitement/vente-boutique",
+            label: "Vente Boutique (POS)",
+            icon: ShoppingCart,
+          },
+          {
+            href: "/manager/traitement/inventaire",
+            label: "Inventaires",
+            icon: ClipboardList,
+          },
+          {
+            href: "/manager/traitement/operations",
+            label: "Opérations",
+            icon: Settings,
+          },
+          {
+            href: "/manager/traitement/doleances",
+            label: "Doléances",
+            icon: AlertCircle,
+            badge: 0,
+            badgeVariant: "danger",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    label: "Analyse",
+    items: [{ href: "/manager/rapports", label: "Rapports", icon: BarChart3 }],
+  },
+  {
+    label: "Administration",
+    items: [
+      { href: "/manager/users", label: "Utilisateurs", icon: Users },
+      { href: "/manager/notifications", label: "Notifications", icon: Bell },
+      { href: "/manager/parametres", label: "Paramètres", icon: Settings },
+    ],
+  },
+];
+
+interface SidebarProps {
+  onNavigate?: () => void;
+}
+
+function SidebarContent({ onNavigate }: SidebarProps) {
+  const pathname = usePathname();
+  const { logout, compte, entreprise } = useAuth();
+  const [expandedItems, setExpandedItems] = useState<string[]>(() => {
+    const active = navSections
+      .flatMap((s) => s.items)
+      .find((i) => i.children?.some((c) => pathname.startsWith(c.href)));
+    return active ? [active.href] : [];
+  });
+
+  const toggleExpand = (href: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(href) ? prev.filter((h) => h !== href) : [...prev, href],
+    );
+  };
+
+  const isActive = (href: string) =>
+    pathname === href || pathname.startsWith(href + "/");
+
+  const initials = (name?: string | null) => {
+    if (!name) return "?";
+    return name
+      .split(" ")
+      .map((w) => w[0])
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
+  };
+
+  return (
+    <div
+      className="flex flex-col h-full"
+      style={{
+        background: "var(--nav)",
+        borderRight: "0.5px solid var(--border)",
+      }}
+    >
+      {/* Brand */}
+      <div
+        className="px-4 py-[14px]"
+        style={{ borderBottom: "0.5px solid var(--border)" }}
+      >
+        <div className="flex items-center gap-[9px]">
+          <div
+            className="flex items-center justify-center shrink-0"
+            style={{
+              width: 32,
+              height: 32,
+              background: "var(--brand)",
+              borderRadius: 8,
+            }}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              style={{ width: 18, height: 18, fill: "white" }}
+            >
+              <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33a2.5 2.5 0 002.5 2.5c.36 0 .69-.08 1-.21v7.21a1 1 0 01-2 0V14a2 2 0 00-2-2h-1V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16h10v-7.5h1.5v5a2.5 2.5 0 005 0V9c0-.69-.28-1.32-.73-1.77zM18 9.5a1 1 0 110-2 1 1 0 010 2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" />
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p
+              style={{
+                fontSize: 14,
+                fontWeight: 800,
+                color: "#fff",
+                letterSpacing: "-0.3px",
+                lineHeight: 1,
+              }}
+            >
+              SuccessFuel
+            </p>
+            <p
+              style={{
+                fontSize: "9.5px",
+                color: "rgba(255,255,255,0.35)",
+                marginTop: 1,
+                textTransform: "uppercase",
+                letterSpacing: "0.4px",
+              }}
+            >
+              Gestion station-service
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Station widget */}
+      {entreprise && (
+        <div
+          className="mx-[10px] my-[8px] px-[11px] py-[8px]"
+          style={{
+            background: "var(--brand-light)",
+            border: "0.5px solid var(--brand-bd)",
+            borderRadius: 8,
+          }}
+        >
+          <p
+            style={{
+              fontSize: 9,
+              fontWeight: 700,
+              color: "var(--brand-mid)",
+              textTransform: "uppercase",
+              letterSpacing: "0.6px",
+            }}
+          >
+            Entreprise active
+          </p>
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#fff",
+              marginTop: 2,
+            }}
+            className="truncate"
+          >
+            {entreprise.nom}
+          </p>
+        </div>
+      )}
+
+      {/* Navigation */}
+      <nav
+        className="flex-1 overflow-y-auto"
+        style={{
+          padding: "4px 8px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+        }}
+      >
+        {navSections.map((section) => (
+          <div key={section.label}>
+            {section.label && (
+              <p
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: "var(--txt4, #2E4560)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.8px",
+                  padding: "9px 8px 3px",
+                }}
+              >
+                {section.label}
+              </p>
+            )}
+            {section.items.map((item) =>
+              item.children ? (
+                <div key={item.href}>
+                  <button
+                    onClick={() => toggleExpand(item.href)}
+                    className={cn(
+                      "flex items-center gap-2 w-full transition-all",
+                      isActive(item.href)
+                        ? "sf-nav-item-active"
+                        : "sf-nav-item",
+                    )}
+                    style={{
+                      padding: "8px 9px",
+                      borderRadius: 7,
+                      fontSize: 12,
+                      fontWeight: isActive(item.href) ? 600 : 400,
+                      color: isActive(item.href)
+                        ? "var(--brand-mid)"
+                        : "rgba(255,255,255,0.45)",
+                      background: isActive(item.href)
+                        ? "var(--brand-light)"
+                        : "transparent",
+                      border: isActive(item.href)
+                        ? "0.5px solid var(--brand-bd)"
+                        : "0.5px solid transparent",
+                      cursor: "pointer",
+                      width: "100%",
+                      textAlign: "left",
+                    }}
+                  >
+                    <item.icon
+                      className="shrink-0"
+                      style={{
+                        width: 14,
+                        height: 14,
+                        opacity: isActive(item.href) ? 1 : 0.7,
+                      }}
+                    />
+                    <span className="flex-1">{item.label}</span>
+                    {expandedItems.includes(item.href) ? (
+                      <ChevronDown
+                        style={{ width: 12, height: 12, opacity: 0.5 }}
+                      />
+                    ) : (
+                      <ChevronRight
+                        style={{ width: 12, height: 12, opacity: 0.5 }}
+                      />
+                    )}
+                  </button>
+                  {expandedItems.includes(item.href) && (
+                    <div
+                      style={{
+                        marginLeft: 12,
+                        paddingLeft: 10,
+                        borderLeft: "1px solid var(--border)",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onNavigate}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "7px 8px",
+                            borderRadius: 6,
+                            fontSize: 11.5,
+                            fontWeight: isActive(child.href) ? 600 : 400,
+                            color: isActive(child.href)
+                              ? "var(--brand-mid)"
+                              : "rgba(255,255,255,0.4)",
+                            background: isActive(child.href)
+                              ? "var(--brand-light)"
+                              : "transparent",
+                            marginBottom: 1,
+                            transition: "all 0.12s",
+                          }}
+                          className="sf-nav-child"
+                        >
+                          <child.icon
+                            style={{ width: 12, height: 12, flexShrink: 0 }}
+                          />
+                          <span className="flex-1 truncate">{child.label}</span>
+                          {child.badge !== undefined && child.badge > 0 && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                padding: "1px 6px",
+                                borderRadius: 8,
+                                fontWeight: 700,
+                                background:
+                                  child.badgeVariant === "warning"
+                                    ? "var(--color-warning-bg)"
+                                    : "var(--color-danger-bg)",
+                                color:
+                                  child.badgeVariant === "warning"
+                                    ? "var(--color-warning)"
+                                    : "var(--color-danger)",
+                                border: `0.5px solid ${child.badgeVariant === "warning" ? "var(--color-warning-bd)" : "var(--color-danger-bd)"}`,
+                              }}
+                            >
+                              {child.badge}
+                            </span>
+                          )}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 9px",
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: isActive(item.href) ? 600 : 400,
+                    color: isActive(item.href)
+                      ? "var(--brand-mid)"
+                      : "rgba(255,255,255,0.45)",
+                    background: isActive(item.href)
+                      ? "var(--brand-light)"
+                      : "transparent",
+                    border: isActive(item.href)
+                      ? "0.5px solid var(--brand-bd)"
+                      : "0.5px solid transparent",
+                    marginBottom: 1,
+                    transition: "all 0.12s",
+                  }}
+                >
+                  <item.icon
+                    className="shrink-0"
+                    style={{
+                      width: 14,
+                      height: 14,
+                      opacity: isActive(item.href) ? 1 : 0.7,
+                    }}
+                  />
+                  <span className="flex-1 truncate">{item.label}</span>
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        padding: "1px 6px",
+                        borderRadius: 8,
+                        fontWeight: 700,
+                        background:
+                          item.badgeVariant === "warning"
+                            ? "var(--color-warning-bg)"
+                            : "var(--color-danger-bg)",
+                        color:
+                          item.badgeVariant === "warning"
+                            ? "var(--color-warning)"
+                            : "var(--color-danger)",
+                      }}
+                    >
+                      {item.badge}
+                    </span>
+                  )}
+                </Link>
+              ),
+            )}
+          </div>
+        ))}
+      </nav>
+
+      {/* User footer */}
+      <div
+        style={{
+          padding: "10px 12px",
+          borderTop: "0.5px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          gap: 9,
+        }}
+      >
+        <div
+          className="shrink-0 flex items-center justify-center"
+          style={{
+            width: 28,
+            height: 28,
+            borderRadius: "50%",
+            background: "var(--brand)",
+            fontSize: 10,
+            fontWeight: 800,
+            color: "white",
+          }}
+        >
+          {initials(compte?.nom)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#fff",
+              lineHeight: 1.2,
+            }}
+            className="truncate"
+          >
+            {compte?.nom ?? "—"}
+          </p>
+          <p
+            style={{ fontSize: 10, color: "var(--txt3, #4D6680)" }}
+            className="truncate"
+          >
+            Gérant
+          </p>
+        </div>
+        <button
+          onClick={logout}
+          title="Déconnexion"
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            borderRadius: 6,
+            color: "rgba(255,255,255,0.3)",
+          }}
+          className="hover:text-red-400 transition-colors"
+        >
+          <LogOut style={{ width: 14, height: 14 }} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
+  const pathname = usePathname();
+
+  const pageTitle = (() => {
+    if (pathname.includes("/dashboard")) return "Tableau de bord";
+    if (pathname.includes("/stations")) return "Mes stations";
+    if (pathname.includes("/structure/comptes")) return "Plan comptable";
+    if (pathname.includes("/structure/tiers")) return "Tiers";
+    if (pathname.includes("/structure/articles")) return "Articles / Produits";
+    if (pathname.includes("/structure/carburants")) return "Carburants";
+    if (pathname.includes("/structure/tresorerie")) return "Trésorerie";
+    if (pathname.includes("/structure/camions")) return "Camions";
+    if (pathname.includes("/structure/services")) return "Services";
+    if (pathname.includes("/structure/objectifs")) return "Objectifs & Seuils";
+    if (pathname.includes("/structure")) return "Structure";
+    if (pathname.includes("/initialisation")) return "Initialisation";
+    if (pathname.includes("/traitement/achat-carburant"))
+      return "Achat Carburant";
+    if (pathname.includes("/traitement/vente-carburant"))
+      return "Vente Carburant";
+    if (pathname.includes("/traitement/achat-boutique"))
+      return "Achat Boutique";
+    if (pathname.includes("/traitement/vente-boutique"))
+      return "Vente Boutique (POS)";
+    if (pathname.includes("/traitement/inventaire")) return "Inventaires";
+    if (pathname.includes("/traitement/operations")) return "Opérations";
+    if (pathname.includes("/traitement/doleances")) return "Doléances";
+    if (pathname.includes("/traitement")) return "Traitement";
+    if (pathname.includes("/rapports")) return "Rapports";
+    if (pathname.includes("/users")) return "Utilisateurs";
+    if (pathname.includes("/notifications")) return "Notifications";
+    if (pathname.includes("/parametres")) return "Paramètres";
+    return "SuccessFuel";
+  })();
+
+  return (
+    <div
+      style={{
+        background: "var(--card)",
+        borderBottom: "0.5px solid var(--border)",
+        padding: "0 20px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        height: 50,
+        flexShrink: 0,
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          className="md:hidden"
+          onClick={onMenuClick}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            color: "var(--txt2, #8BA4BF)",
+          }}
+        >
+          <Menu style={{ width: 18, height: 18 }} />
+        </button>
+        <div>
+          <p
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--foreground)",
+              lineHeight: 1.1,
+            }}
+          >
+            {pageTitle}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <NotificationCenter />
+      </div>
+    </div>
+  );
+}
+
+export function ManagerLayout({ children }: { children: React.ReactNode }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <div
+      className="flex h-screen overflow-hidden"
+      style={{ background: "var(--background)" }}
+    >
+      {/* Desktop Sidebar */}
+      <aside
+        className="hidden md:flex flex-col shrink-0"
+        style={{ width: 230 }}
+      >
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile Sidebar */}
+      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        <SheetContent
+          side="left"
+          className="p-0"
+          style={{ width: 230, background: "var(--nav)" }}
+        >
+          <SidebarContent onNavigate={() => setMobileOpen(false)} />
+        </SheetContent>
+      </Sheet>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopBar onMenuClick={() => setMobileOpen(true)} />
+        <main className="flex-1 overflow-y-auto">{children}</main>
+      </div>
+    </div>
+  );
+}

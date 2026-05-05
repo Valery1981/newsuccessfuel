@@ -1,0 +1,172 @@
+import { createClient } from "@/utils/supabase/client";
+import type { Database } from "@/types/supabase";
+
+const supabase = createClient();
+
+export const initialisationService = {
+  async getOrCreateInitialisation(entrepriseId: string) {
+    // Try to get existing
+    const { data: existing } = await supabase
+      .from("initialisation")
+      .select("*")
+      .eq("entreprise_id", entrepriseId)
+      .single();
+
+    if (existing) return existing;
+
+    // Create new
+    const { data, error } = await supabase
+      .from("initialisation")
+      .insert({ entreprise_id: entrepriseId })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async saveInitialisationCuves(
+    initialisationId: string,
+    entries: Array<{
+      cuve_id: string;
+      station_id: string;
+      jauge_initiale_cm: number;
+      volume_initial_litres: number;
+      prix_achat_initial: number;
+    }>
+  ) {
+    // Delete existing for this initialisation
+    await supabase
+      .from("initialisation_cuves")
+      .delete()
+      .eq("initialisation_id", initialisationId);
+
+    if (entries.length === 0) return;
+
+    const { error } = await supabase.from("initialisation_cuves").insert(
+      entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+    );
+    if (error) throw error;
+  },
+
+  async saveInitialisationIndexPistolets(
+    initialisationId: string,
+    entries: Array<{
+      pistolet_id: string;
+      station_id: string;
+      index_initial: number;
+    }>
+  ) {
+    await supabase
+      .from("initialisation_index_pistolets")
+      .delete()
+      .eq("initialisation_id", initialisationId);
+
+    if (entries.length === 0) return;
+
+    const { error } = await supabase
+      .from("initialisation_index_pistolets")
+      .insert(
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+      );
+    if (error) throw error;
+  },
+
+  async saveInitialisationStocksBoutique(
+    initialisationId: string,
+    entries: Array<{
+      article_id: string;
+      station_id: string;
+      quantite_initiale: number;
+      prix_achat_initial: number;
+    }>
+  ) {
+    await supabase
+      .from("initialisation_stocks_boutique")
+      .delete()
+      .eq("initialisation_id", initialisationId);
+
+    if (entries.length === 0) return;
+
+    const { error } = await supabase
+      .from("initialisation_stocks_boutique")
+      .insert(
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+      );
+    if (error) throw error;
+  },
+
+  async saveInitialisationComptes(
+    initialisationId: string,
+    entries: Array<{
+      numero_compte: string;
+      libelle_compte: string;
+      solde_debit: number;
+      solde_credit: number;
+      tiers_id?: string;
+      tresorerie_id?: string;
+      onglet: "immobilisations" | "tiers" | "tresorerie" | "autres_dettes";
+    }>
+  ) {
+    await supabase
+      .from("initialisation_comptes")
+      .delete()
+      .eq("initialisation_id", initialisationId);
+
+    if (entries.length === 0) return;
+
+    const { error } = await supabase.from("initialisation_comptes").insert(
+      entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+    );
+    if (error) throw error;
+  },
+
+  async validerInitialisation(initialisationId: string, compteId: string) {
+    // Calculate capital net
+    const { data: capitalNet } = await supabase.rpc("calculer_capital_net", {
+      p_initialisation_id: initialisationId,
+    });
+
+    // Mark as validated
+    const { data, error } = await supabase
+      .from("initialisation")
+      .update({
+        est_validee: true,
+        validee_at: new Date().toISOString(),
+        validee_par: compteId,
+        capital_net_calcule: capitalNet as number,
+      })
+      .eq("id", initialisationId)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getInitialisationData(initialisationId: string) {
+    const [cuves, pistolets, stocks, comptes] = await Promise.all([
+      supabase
+        .from("initialisation_cuves")
+        .select("*, cuves(nom, type_carburant)")
+        .eq("initialisation_id", initialisationId),
+      supabase
+        .from("initialisation_index_pistolets")
+        .select("*, pistolets(numero, type_carburant)")
+        .eq("initialisation_id", initialisationId),
+      supabase
+        .from("initialisation_stocks_boutique")
+        .select("*, articles(nom, unite)")
+        .eq("initialisation_id", initialisationId),
+      supabase
+        .from("initialisation_comptes")
+        .select("*")
+        .eq("initialisation_id", initialisationId),
+    ]);
+
+    return {
+      cuves: cuves.data ?? [],
+      pistolets: pistolets.data ?? [],
+      stocks: stocks.data ?? [],
+      comptes: comptes.data ?? [],
+    };
+  },
+};
