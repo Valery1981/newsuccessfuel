@@ -1,36 +1,188 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SuccessFuel ERP
 
-## Getting Started
+Système ERP complet pour la gestion de stations-service, incluant gestion des stocks, comptabilité en partie double, POS boutique, et rapports analytiques.
 
-First, run the development server:
+## 🚀 Stack Technique
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Framework**: Next.js 16 (App Router)
+- **Langage**: TypeScript (strict mode)
+- **Backend**: Supabase (PostgreSQL, Auth, Storage, Realtime)
+- **State Management**: Zustand + TanStack Query
+- **UI**: Tailwind CSS + shadcn/ui
+- **Validation**: Zod
+- **Internationalisation**: next-intl (Français/Anglais)
+- **Tests**: Vitest (unit) + Playwright (E2E)
+- **PWA**: Service Worker manuel pour offline
+
+## ✨ Fonctionnalités Principales
+
+### 🔐 Authentification & Permissions
+
+- Inscription/Login avec email
+- Onboarding multi-étapes (6 étapes)
+- First-login avec mot de passe à changer
+- Permissions granulaires par page
+- Sessions employés
+
+### 📦 Gestion des Stocks
+
+- Inventaire carburant (jauge cuves)
+- Inventaire boutique (articles)
+- Mouvements de stock
+- CMUP calcul automatique
+- Calibrage cuves (OCR PDF/image)
+
+### 💰 Comptabilité
+
+- Partie double automatique
+- Écriture prévisualisation avant validation
+- 10 points d'entrée comptables:
+  - Achat carburant
+  - Achat boutique
+  - Virement interne
+  - Initialisation
+  - Encaissement créances
+  - Règlement dettes
+  - Charges courantes
+  - Salaires
+  - Opérations gérant
+  - Immobilisations
+
+### 🛒 Point de Vente (POS)
+
+- POS boutique avec catalogue
+- Shifts carburant pompistes
+- Gestion des paiements
+- Impression tickets
+
+### 📊 Rapports
+
+- **Manager**: 14 rapports (ventes, stocks, comptabilité)
+- **Admin**: 7 pages (dashboard, stations, dépenses, revenue, audit logs)
+- **Partner**: 4 pages + rapports opérationnels
+- Dashboards analytiques
+
+### 🔔 Notifications
+
+- Notifications Realtime Supabase
+- Doléances client
+- Alertes stock
+
+## 📁 Structure du Projet
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── (admin)/           # Admin pages
+│   ├── (manager)/         # Manager pages
+│   ├── (partner)/         # Partner pages
+│   ├── (auth)/            # Auth pages
+│   └── api/               # API routes
+├── components/            # React components
+│   ├── admin/
+│   ├── manager/
+│   ├── partner/
+│   ├── auth/
+│   ├── common/            # Shared components
+│   └── compta/            # Comptability components
+├── services/              # Supabase services
+├── stores/                # Zustand stores
+├── hooks/                 # Custom hooks
+├── lib/                   # Utilities
+└── types/                 # TypeScript types
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🛠️ Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Clone le repository
+git clone https://github.com/Jordanras96/newsuccessfuel.git
+cd newsuccessfuel
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Install dependencies
+npm install
 
-## Learn More
+# Configure environment variables
+cp .env.example .env.local
+# Edit .env.local avec vos credentials Supabase
 
-To learn more about Next.js, take a look at the following resources:
+# Run development server
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🧪 Tests
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# Tests unitaires
+npm run test
 
-## Deploy on Vercel
+# Tests E2E
+npm run test:e2e
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Tests avec coverage
+npm run test:coverage
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Audit & Qualité
+
+- **Conformité rules.md**: 99%
+- **Tests unitaires**: 112 tests
+- **Tests E2E**: 10 specs (40 passed, 3 skipped)
+- **TypeScript strict**: 99% (2 `any` avec eslint-disable, schema DB à aligner)
+- **0 console.log, 0 TODO/FIXME**
+
+Voir `guide/AUDIT_SRC.md` pour l'audit complet.
+
+## 🚢 Déploiement
+
+Le projet est configuré pour Vercel:
+
+```bash
+# Build
+npm run build
+
+# Preview
+npm run preview
+```
+
+Variables d'environnement requises:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `OCR_SPACE_API_KEY` (pour calibrage OCR)
+
+## 📖 Documentation
+
+- `guide/rules.md` - Règles métier et techniques
+- `guide/AUDIT_SRC.md` - Audit complet du code
+- `guide/APEX_PLAN.md` - Journal des 9 phases APEX
+- `guide/Guide_Document_SuccessFuel.md` - Guide utilisateur
+
+## 👥 Rôles Utilisateurs
+
+### Superadmin
+
+- Accès complet admin
+- Validation des stations
+- Audit logs
+
+### Gérant
+
+- Gestion quotidienne station
+- POS boutique
+- Shifts carburant
+- Rapports
+
+### Partenaire
+
+- Rapports opérationnels
+- Dashboard partenaire
+- Notifications
+
+## 📄 License
+
+MIT
+
+## 🤝 Contribution
+
+Les contributions sont les bienvenues! Veuillez créer une issue ou un pull request.

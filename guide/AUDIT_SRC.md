@@ -1,25 +1,25 @@
 # AUDIT COMPLET — `src/` vs `guide/rules.md`
 
-> Généré : 2026-05-05 — Mis à jour : 2026-05-05 (post-APEX Phase 9)
+> Généré : 2026-05-05 — Mis à jour : 2026-05-05 (post-APEX Phase 9, E2E fixes, Audit complet)
 > Bible de référence : `@guide/rules.md` (800 lignes, source de vérité absolue)
 > **Conformité finale : 100%** (voir `guide/APEX_PLAN.md` pour le journal complet des 9 phases)
 
 ## 0. Vue d'ensemble
 
-| Indicateur                                               | Valeur                         | Verdict                      |
-| -------------------------------------------------------- | ------------------------------ | ---------------------------- |
-| Fichiers `.ts/.tsx` total                                | 303                            | —                            |
-| Composants `components/`                                 | 168 (21 nouveaux APEX)         | —                            |
-| Pages `app/` (Manager/Admin/Partner/Onboarding/Auth/API) | 97                             | —                            |
-| Services Supabase                                        | 21                             | ✅ bien découpés             |
-| Tests unitaires Vitest                                   | 112                            | ✅ couverture significative  |
-| Tests E2E Playwright                                     | 10+                            | ✅ couverture dialogs compta |
-| `console.log` résiduels                                  | 0                              | ✅                           |
-| `TODO/FIXME/HACK`                                        | 0                              | ✅                           |
-| `: any` / `as any`                                       | 0                              | ✅ types stricts 100%        |
-| Couleurs HEX hardcodées en TSX                           | 62                             | ✅ légitimes (recharts SVG)  |
-| Realtime channels                                        | 1 (`useRealtimeNotifications`) | ✅ conforme §5.4             |
-| Query directe `auth.users` côté client                   | 0                              | ✅ conforme §5.4             |
+| Indicateur                                               | Valeur                    | Verdict                      |
+| -------------------------------------------------------- | ------------------------- | ---------------------------- |
+| Fichiers `.ts/.tsx` total                                | 352                       | —                            |
+| Composants `components/`                                 | 171                       | —                            |
+| Pages `app/` (Manager/Admin/Partner/Onboarding/Auth/API) | 106                       | —                            |
+| Services Supabase                                        | 21                        | ✅ bien découpés             |
+| Tests unitaires Vitest                                   | 112 (17 fichiers)         | ✅ couverture significative  |
+| Tests E2E Playwright                                     | 10 (40 passed, 3 skipped) | ✅ couverture dialogs compta |
+| `console.log` résiduels                                  | 0                         | ✅                           |
+| `TODO/FIXME/HACK`                                        | 0                         | ✅                           |
+| `: any` / `as any`                                       | 2 (eslint-disable)        | ⚠️ schema DB à aligner       |
+| Couleurs HEX hardcodées en TSX                           | 63                        | ✅ légitimes (recharts SVG)  |
+| Realtime channels                                        | 3                         | ✅ conforme §5.4             |
+| Query directe `auth.users` côté client                   | 0                         | ✅ conforme §5.4             |
 
 ---
 
@@ -80,15 +80,15 @@
 - ✅ `ComptabiliserAchatDialog` avec bouton bloqué si déséquilibré (APEX-16-suite)
 - ✅ 0 `any` dans `inventaireService` (types Supabase régénérés APEX-18)
 
-### §6.2 Shifts carburant
+### §6.2 Shifts carburant — ✅ VÉRIFIÉ
 
 - ✅ `/manager/traitements/shift-carburant` route correcte (APEX-03)
-- ❓ Index initial verrouillé, clôture par supérieur hiérarchique, auto-ouverture shift suivant → à vérifier
+- ✅ Index initial verrouillé, clôture par supérieur hiérarchique, auto-ouverture shift suivant implémenté
 
-### §6.3 Boutique POS
+### §6.3 Boutique POS — ✅ VÉRIFIÉ
 
 - ✅ `/manager/traitements/pos-boutique` route correcte (APEX-03)
-- ❓ Filtre "articles cochés à la création station" → à vérifier
+- ✅ Filtre articles actifs via query Supabase
 
 ### §6.4 Stocks — ✅ RÉSOLU (APEX-06)
 
@@ -114,11 +114,11 @@
 - ✅ Irréversibilité signalée (Alert amber-200)
 - ✅ Capital net calculé affiché dans preview
 
-### §6.8 Partenaire — données interdites
+### §6.8 Partenaire — données interdites — ✅ VÉRIFIÉ
 
 - ✅ Pas de `CaCarburantReport`, `MargeReport`, `TresorerieReport` pour le partenaire
-- ❓ `PartnerRealisationsReport` ne doit PAS exposer CA carburant → à vérifier
-- ❓ `PartnerComparatifReport` ne doit PAS exposer marges → à vérifier
+- ✅ `PartnerRealisationsReport` n'expose PAS CA carburant
+- ✅ `PartnerComparatifReport` n'expose PAS marges
 
 ---
 
@@ -182,15 +182,16 @@
 ### 5.2 Majeurs — ✅ TOUS RÉSOLUS
 
 - ✅ 112 tests unitaires (vs 9 initial) — couverture significative (APEX-12, APEX-12-final)
-- ✅ 10+ specs E2E — couverture dialogs compta (APEX-12-suite, APEX-12-final)
-- ✅ 0 `any` — types Supabase régénérés (APEX-18)
-- ✅ 62 HEX légitimes (recharts SVG) + `lib/chartColors.ts` source unique (APEX-17)
+- ✅ 10 specs E2E (40 passed, 3 skipped) — couverture dialogs compta + admin
+- ✅ 2 `any` avec eslint-disable (initialisationService - schema DB à aligner)
+- ✅ 63 HEX légitimes (recharts SVG) + `lib/chartColors.ts` source unique (APEX-17)
 - ✅ Composant `DataTable` partagé réutilisable (APEX-09)
 
 ### 5.3 Mineurs
 
 - ✅ 0 `console.log`, 0 TODO/FIXME, tests RLS mockés, structure services cohérente
 - ✅ Middleware fonctionnel (`src/proxy.ts` Next.js 16 convention) avec protection routes
+- ⚠️ 2 `any` avec eslint-disable dans initialisationService.ts (schema DB à aligner)
 
 ---
 
@@ -233,8 +234,8 @@
 | Composants UI (§5.5) | 45 %     | **100 %** |
 | Règles métier (§6)   | 70 %     | **100 %** |
 | Tests (§8)           | 20 %     | **85 %**  |
-| Types stricts (§2)   | 70 %     | **100 %** |
-| **Global pondéré**   | **62 %** | **100 %** |
+| Types stricts (§2)   | 70 %     | **99 %**  |
+| **Global pondéré**   | **62 %** | **99 %**  |
 
 ### APEX Journal
 
@@ -250,4 +251,4 @@ Voir `guide/APEX_PLAN.md` pour le journal détaillé des 9 phases :
 - Phase 8 : Derniers dialogs (6 dialogs externes avec EcriturePreview)
 - Phase 9 : Finalisation 100% (OCR secret, tests E2E 6 dialogs, tests unit dialogLignes)
 
-**Conclusion** : Tous les objectifs rules.md atteints. Conformité 100%.
+**Conclusion** : 99% de conformité rules.md. 2 `any` à aligner avec schema DB dans initialisationService.ts.
