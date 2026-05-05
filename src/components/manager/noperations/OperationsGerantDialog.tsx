@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -394,6 +395,33 @@ export function OperationsGerantDialog({ open, onClose }: Props) {
             </div>
           )}
 
+          {/* APEX-16-extra : Aperçu écriture comptable (réutilise buildLignes) */}
+          {form.tresorerie_id && Number(form.montant) > 0 && (
+            <EcriturePreview
+              title="Écriture qui sera générée"
+              currency="MGA"
+              lignes={buildLignes(
+                form.sousType,
+                Number(form.montant),
+                tresoreries?.find((t) => t.id === form.tresorerie_id)
+                  ? {
+                      id: form.tresorerie_id,
+                      numero_compte:
+                        tresoreries.find((t) => t.id === form.tresorerie_id)
+                          ?.numero_compte ?? null,
+                      libelle:
+                        tresoreries.find((t) => t.id === form.tresorerie_id)
+                          ?.libelle ?? "Trésorerie",
+                    }
+                  : undefined,
+                "preview",
+              ).map((l) => ({
+                libelleCompte: l.libelle_compte ?? "—",
+                debit: l.debit ?? 0,
+                credit: l.credit ?? 0,
+              }))}
+            />
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"

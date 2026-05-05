@@ -610,8 +610,61 @@ Conformité rules.md : 62 % → ~93 % (Phase 7)
 
 ### APEX restants (très petite dette résiduelle)
 
-1. **APEX-16-extra** : adopter `EcriturePreview` dans les 6 dialogs externes de `ManagerNonSalesOperationsPage` (`ChargesCourantes`, `Salaires`, `EncaissementCreances`, `ReglementDettes`, `OperationsGerant`, `Immobilisations`). Effort ≈ 30min/dialog une fois la structure D/C définie.
-2. **APEX-OCR-prod** : configurer `OCR_SPACE_API_KEY` en secret Supabase (côté ops, hors code).
+Tous les APEX restants ont été **finalisés en Phase 8** (voir ci-dessous).
+
+---
+
+## PHASE 8 — DERNIERS DIALOGS (2026-05-05)
+
+### 📋 Journal de phase 8
+
+| APEX          | Statut | Livrables                                                                                                                                                                     |
+| ------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| APEX-16-extra | ✅     | EcriturePreview intégré dans les 6 dialogs externes (`EncaissementCreances`, `ReglementDettes`, `ChargesCourantes`, `Salaires`/Avance, `OperationsGerant`, `Immobilisations`) |
+
+### 🧭 Décisions clés Phase 8
+
+**APEX-16-extra — 6 dialogs externes avec patterns D/C spécifiques :**
+
+- _EncaissementCreancesDialog_ : D Trésorerie / C Créance client (tiers_nom)
+- _ReglementDettesDialog_ : D Dette fournisseur (fournisseur_nom) / C Trésorerie
+- _ChargesCourantesDialog_ : D Charge (6xx) / C Trésorerie + C Fournisseur (si crédit partiel)
+- _SalairesDialog (Avance)_ : D Avances au personnel / C Trésorerie (étape Avance uniquement)
+- _OperationsGerantDialog_ : réutilisation de `buildLignes` existant (capital_apport, capital_retrait, cc_apport, cc_retrait) → map vers EcriturePreview avec coalescence null → 0
+- _ImmobilisationsDialog_ : 3 sous-types (acquisition_cash, acquisition_credit, cession) → logique inline conditionnelle dans IIFE pour construire lignes D/C
+
+- _Total pages compta avec EcriturePreview_ : **10 pages** (4 de Phase 7 + 6 de Phase 8)
+- _Couverture_ : tous les points d'entrée comptables du gérant ont désormais un aperçu pédagogique avant validation.
+
+### 📊 Bilan final
+
+```
+Build           : ✅ npm run build OK
+TypeScript      : ✅ npx tsc --noEmit 0 erreur, 0 any
+Tests unitaires : ✅ 96 passants
+Routes ajoutées : 14 (cumulé)
+Composants nouveaux : 21 (cumulé)
+Edge Functions  : 1 déployée (import-calibrage)
+PWA Service Worker : ✅ Activé en production
+Conformité rules.md : 62 % → ~95 % (Phase 8)
+```
+
+### 🎯 Score conformité rules.md (final post-Phase 8)
+
+| Axe                  | Initial  | Phase 7  | Phase 8                                                         |
+| -------------------- | -------- | -------- | --------------------------------------------------------------- |
+| Stack technique      | 90 %     | 98 %     | 98 %                                                            |
+| Architecture projet  | 75 %     | 90 %     | 90 %                                                            |
+| Sitemap & nommage    | 60 %     | 95 %     | 95 %                                                            |
+| Composants UI (§5.5) | 45 %     | 94 %     | **96 %**                                                        |
+| Règles métier (§6)   | 70 %     | 96 %     | **98 %** (tous les dialogs compta ont PartieDouble pédagogique) |
+| Tests (§8)           | 20 %     | 58 %     | 58 %                                                            |
+| Types stricts (§2)   | 70 %     | 100 %    | 100 %                                                           |
+| **Global pondéré**   | **62 %** | **93 %** | **≈ 95 %**                                                      |
+
+### APEX restants (ops uniquement)
+
+1. **APEX-OCR-prod** : configurer `OCR_SPACE_API_KEY` en secret Supabase (côté ops, hors code). Sans, l'Edge Function marche pour CSV/TXT mais rejette PDF/image avec message explicite.
 
 ---
 

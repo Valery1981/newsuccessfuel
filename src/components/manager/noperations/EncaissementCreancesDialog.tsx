@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -329,6 +330,29 @@ export function EncaissementCreancesDialog({ open, onClose }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              {/* APEX-16-extra : Aperçu écriture comptable (§5.5-23) */}
+              {tresorerieId && Number(montant) > 0 && (
+                <EcriturePreview
+                  title="Écriture qui sera générée"
+                  currency="MGA"
+                  lignes={[
+                    {
+                      libelleCompte:
+                        (tresoreries ?? []).find((t) => t.id === tresorerieId)
+                          ?.libelle ?? "Trésorerie",
+                      debit: Number(montant),
+                      credit: 0,
+                      libelle: "Encaissement reçu",
+                    },
+                    {
+                      libelleCompte: `Créance client${selected ? ` (${selected.tiers_nom ?? "—"})` : ""}`,
+                      debit: 0,
+                      credit: Number(montant),
+                      libelle: "Extinction partielle/totale",
+                    },
+                  ]}
+                />
+              )}
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" onClick={handleClose}>
                   Annuler

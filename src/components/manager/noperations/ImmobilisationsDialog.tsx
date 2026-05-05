@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -515,6 +516,70 @@ export function ImmobilisationsDialog({ open, onClose }: Props) {
             </>
           )}
 
+          {/* APEX-16-extra : Aperçu écriture comptable (§5.5-23) */}
+          {form.numero_compte_immo &&
+            Number(form.montant) > 0 &&
+            (() => {
+              const m = Number(form.montant);
+              const tresorerieLibelle =
+                (tresoreries ?? []).find((t) => t.id === form.tresorerie_id)
+                  ?.libelle ?? "Trésorerie";
+              const fournisseurNom =
+                (fournisseurs ?? []).find((f) => f.id === form.fournisseur_id)
+                  ?.nom ?? "Fournisseur";
+              const lignes =
+                form.sousType === "acquisition_cash"
+                  ? [
+                      {
+                        libelleCompte: form.libelle_compte_immo,
+                        debit: m,
+                        credit: 0,
+                        libelle: "Acquisition immobilisation",
+                      },
+                      {
+                        libelleCompte: tresorerieLibelle,
+                        debit: 0,
+                        credit: m,
+                        libelle: "Sortie trésorerie",
+                      },
+                    ]
+                  : form.sousType === "acquisition_credit"
+                    ? [
+                        {
+                          libelleCompte: form.libelle_compte_immo,
+                          debit: m,
+                          credit: 0,
+                          libelle: "Acquisition à crédit",
+                        },
+                        {
+                          libelleCompte: `Fournisseur ${fournisseurNom}`,
+                          debit: 0,
+                          credit: m,
+                          libelle: "Reste à payer",
+                        },
+                      ]
+                    : [
+                        {
+                          libelleCompte: tresorerieLibelle,
+                          debit: m,
+                          credit: 0,
+                          libelle: "Encaissement cession",
+                        },
+                        {
+                          libelleCompte: form.libelle_compte_immo,
+                          debit: 0,
+                          credit: m,
+                          libelle: "Sortie immobilisation",
+                        },
+                      ];
+              return (
+                <EcriturePreview
+                  title="Écriture qui sera générée"
+                  currency="MGA"
+                  lignes={lignes}
+                />
+              );
+            })()}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"

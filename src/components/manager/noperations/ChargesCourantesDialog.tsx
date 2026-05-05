@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -522,6 +523,44 @@ export function ChargesCourantesDialog({ open, onClose }: Props) {
             </>
           )}
 
+          {/* APEX-16-extra : Aperçu écriture comptable (§5.5-23) */}
+          {form.numero_compte_charge && Number(form.montant) > 0 && (
+            <EcriturePreview
+              title="Écriture qui sera générée"
+              currency="MGA"
+              lignes={[
+                {
+                  libelleCompte: form.libelle_compte_charge || "Charge",
+                  debit: Number(form.montant),
+                  credit: 0,
+                  libelle: "Charge de la période",
+                },
+                ...(Number(form.montant_cash) > 0 && form.tresorerie_id
+                  ? [
+                      {
+                        libelleCompte:
+                          (tresoreries ?? []).find(
+                            (t) => t.id === form.tresorerie_id,
+                          )?.libelle ?? "Trésorerie",
+                        debit: 0,
+                        credit: Number(form.montant_cash),
+                        libelle: "Paiement immédiat",
+                      },
+                    ]
+                  : []),
+                ...(Number(form.montant_credit) > 0 && form.fournisseur_id
+                  ? [
+                      {
+                        libelleCompte: `Fournisseur ${(fournisseurs ?? []).find((f) => f.id === form.fournisseur_id)?.nom ?? ""}`,
+                        debit: 0,
+                        credit: Number(form.montant_credit),
+                        libelle: "Reste à payer",
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               variant="outline"

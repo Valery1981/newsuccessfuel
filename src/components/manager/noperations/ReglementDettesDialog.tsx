@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -347,6 +348,29 @@ export function ReglementDettesDialog({ open, onClose }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              {/* APEX-16-extra : Aperçu écriture comptable (§5.5-23) */}
+              {tresorerieId && Number(montant) > 0 && (
+                <EcriturePreview
+                  title="Écriture qui sera générée"
+                  currency="MGA"
+                  lignes={[
+                    {
+                      libelleCompte: `Dette fournisseur${selected ? ` (${selected.fournisseur_nom ?? "—"})` : ""}`,
+                      debit: Number(montant),
+                      credit: 0,
+                      libelle: "Extinction partielle/totale",
+                    },
+                    {
+                      libelleCompte:
+                        (tresoreries ?? []).find((t) => t.id === tresorerieId)
+                          ?.libelle ?? "Trésorerie",
+                      debit: 0,
+                      credit: Number(montant),
+                      libelle: "Sortie paiement",
+                    },
+                  ]}
+                />
+              )}
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="outline" onClick={handleClose}>
                   Annuler

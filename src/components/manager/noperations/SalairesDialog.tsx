@@ -1,5 +1,6 @@
 "use client";
 
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -410,6 +411,30 @@ export function SalairesDialog({ open, onClose }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              {/* APEX-16-extra : Aperçu écriture (avance salaire) */}
+              {avance.tresorerie_id && Number(avance.montant) > 0 && (
+                <EcriturePreview
+                  title="Écriture qui sera générée"
+                  currency="MGA"
+                  lignes={[
+                    {
+                      libelleCompte: "Avances au personnel",
+                      debit: Number(avance.montant),
+                      credit: 0,
+                      libelle: "Créance sur employé",
+                    },
+                    {
+                      libelleCompte:
+                        (tresoreries ?? []).find(
+                          (t) => t.id === avance.tresorerie_id,
+                        )?.libelle ?? "Trésorerie",
+                      debit: 0,
+                      credit: Number(avance.montant),
+                      libelle: "Sortie immédiate",
+                    },
+                  ]}
+                />
+              )}
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={handleClose}>
                   Annuler
