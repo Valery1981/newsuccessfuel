@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle, Clock, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,11 @@ const STATUS_MAP = {
 export function WaitingValidationPage() {
   const router = useRouter();
   const { entreprise } = useAuthStore();
+  const isRouterReady = useRef(false);
+
+  useEffect(() => {
+    isRouterReady.current = true;
+  }, []);
 
   const { data: stations, refetch } = useQuery({
     queryKey: ["stations-validation", entreprise?.id],
@@ -43,6 +48,7 @@ export function WaitingValidationPage() {
 
   // Auto-redirect if any station is validated
   useEffect(() => {
+    if (!isRouterReady.current) return;
     if (stations?.some((s) => s.status === "validee")) {
       router.push("/manager/dashboard");
     }

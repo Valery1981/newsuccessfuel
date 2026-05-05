@@ -25,11 +25,17 @@ export function useOnboardingResume() {
   const { entreprise, compte, isInitialized } = useAuthStore();
   const router = useRouter();
   const hasChecked = useRef(false);
+  const isRouterReady = useRef(false);
+
+  useEffect(() => {
+    isRouterReady.current = true;
+  }, []);
 
   useEffect(() => {
     if (!isInitialized) return;
     if (hasChecked.current) return;
     if (compte?.type !== "gerant") return;
+    if (!isRouterReady.current) return;
 
     hasChecked.current = true;
 

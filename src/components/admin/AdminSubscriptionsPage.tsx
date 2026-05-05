@@ -91,6 +91,166 @@ function getAbonnementStatut(ab: AbonnementAvecRelations): {
   return { label: "Actif", className: "bg-green-100 text-green-700" };
 }
 
+const AbonnementFormFields = ({
+  form,
+  disableEntreprise = false,
+  entreprises,
+  partenaires,
+}: {
+  form: ReturnType<typeof useForm<AbonnementForm>>;
+  disableEntreprise?: boolean;
+  entreprises: Array<{ id: string; nom: string }> | undefined;
+  partenaires: Array<{ id: string; nom: string }> | undefined;
+}) => (
+  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <FormField
+      control={form.control}
+      name="entreprise_id"
+      render={({ field }) => (
+        <FormItem className="sm:col-span-2">
+          <FormLabel>Entreprise *</FormLabel>
+          <Select
+            onValueChange={field.onChange}
+            value={field.value}
+            disabled={disableEntreprise}
+          >
+            <FormControl>
+              <SelectTrigger>
+                <SelectValue placeholder="Sélectionner une entreprise">
+                  {(entreprises ?? []).find((e) => e.id === field.value)?.nom}
+                </SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              {(entreprises ?? []).map((e) => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="partenaire_id"
+      render={({ field }) => (
+        <FormItem className="sm:col-span-2">
+          <FormLabel>Partenaire co-financeur (optionnel)</FormLabel>
+          <Select onValueChange={field.onChange} value={field.value ?? ""}>
+            <FormControl>
+              <SelectTrigger>
+                <SelectValue placeholder="Aucun">
+                  {field.value
+                    ? (partenaires ?? []).find((p) => p.id === field.value)?.nom
+                    : undefined}
+                </SelectValue>
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              <SelectItem value="">Aucun</SelectItem>
+              {(partenaires ?? []).map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="plan"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Plan *</FormLabel>
+          <Select onValueChange={field.onChange} value={field.value}>
+            <FormControl>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+            </FormControl>
+            <SelectContent>
+              <SelectItem value="standard">Standard</SelectItem>
+              <SelectItem value="premium">Premium</SelectItem>
+            </SelectContent>
+          </Select>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="montant"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Montant (Ar)</FormLabel>
+          <FormControl>
+            <Input type="number" min={0} placeholder="0" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="part_gerant"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Part gérant (Ar)</FormLabel>
+          <FormControl>
+            <Input type="number" min={0} placeholder="0" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="part_partenaire"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Part partenaire (Ar)</FormLabel>
+          <FormControl>
+            <Input type="number" min={0} placeholder="0" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="date_debut"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Date début *</FormLabel>
+          <FormControl>
+            <Input type="date" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <FormField
+      control={form.control}
+      name="date_fin"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Date fin</FormLabel>
+          <FormControl>
+            <Input type="date" {...field} />
+          </FormControl>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+  </div>
+);
+
 export function AdminSubscriptionsPage() {
   const qc = useQueryClient();
   const [page, setPage] = useState(0);
@@ -196,163 +356,6 @@ export function AdminSubscriptionsPage() {
   const abonnements = data?.data ?? [];
   const total = data?.count ?? 0;
   const pageCount = Math.ceil(total / PAGE_SIZE);
-
-  const AbonnementFormFields = ({
-    form,
-    disableEntreprise = false,
-  }: {
-    form: ReturnType<typeof useForm<AbonnementForm>>;
-    disableEntreprise?: boolean;
-  }) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <FormField
-        control={form.control}
-        name="entreprise_id"
-        render={({ field }) => (
-          <FormItem className="sm:col-span-2">
-            <FormLabel>Entreprise *</FormLabel>
-            <Select
-              onValueChange={field.onChange}
-              value={field.value}
-              disabled={disableEntreprise}
-            >
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner une entreprise">
-                    {(entreprises ?? []).find((e) => e.id === field.value)?.nom}
-                  </SelectValue>
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                {(entreprises ?? []).map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="partenaire_id"
-        render={({ field }) => (
-          <FormItem className="sm:col-span-2">
-            <FormLabel>Partenaire co-financeur (optionnel)</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value ?? ""}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Aucun">
-                    {field.value
-                      ? (partenaires ?? []).find((p) => p.id === field.value)
-                          ?.nom
-                      : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="">Aucun</SelectItem>
-                {(partenaires ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="plan"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Plan *</FormLabel>
-            <Select onValueChange={field.onChange} value={field.value}>
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem value="standard">Standard</SelectItem>
-                <SelectItem value="premium">Premium</SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="montant"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Montant (Ar)</FormLabel>
-            <FormControl>
-              <Input type="number" min={0} placeholder="0" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="part_gerant"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Part gérant (Ar)</FormLabel>
-            <FormControl>
-              <Input type="number" min={0} placeholder="0" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="part_partenaire"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Part partenaire (Ar)</FormLabel>
-            <FormControl>
-              <Input type="number" min={0} placeholder="0" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="date_debut"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Date début *</FormLabel>
-            <FormControl>
-              <Input type="date" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-      <FormField
-        control={form.control}
-        name="date_fin"
-        render={({ field }) => (
-          <FormItem>
-            <FormLabel>Date fin</FormLabel>
-            <FormControl>
-              <Input type="date" {...field} />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    </div>
-  );
 
   return (
     <PageContainer>
@@ -513,7 +516,11 @@ export function AdminSubscriptionsPage() {
               onSubmit={createForm.handleSubmit((d) => createMut.mutate(d))}
               className="space-y-4"
             >
-              <AbonnementFormFields form={createForm} />
+              <AbonnementFormFields
+                form={createForm}
+                entreprises={entreprises}
+                partenaires={partenaires}
+              />
               <DialogFooter>
                 <Button
                   type="button"
@@ -548,7 +555,12 @@ export function AdminSubscriptionsPage() {
               })}
               className="space-y-4"
             >
-              <AbonnementFormFields form={editForm} disableEntreprise />
+              <AbonnementFormFields
+                form={editForm}
+                disableEntreprise
+                entreprises={entreprises}
+                partenaires={partenaires}
+              />
               <DialogFooter>
                 <Button
                   type="button"

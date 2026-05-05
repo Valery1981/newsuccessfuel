@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import { useEffect } from "react";
 
 export default function Error({
   error,
@@ -26,11 +26,14 @@ export default function Error({
           Erreur serveur
         </h2>
         <p className="text-muted-foreground mb-8 max-w-md mx-auto">
-          Une erreur inattendue s'est produite. Veuillez réessayer.
+          Une erreur inattendue s&apos;est produite. Veuillez réessayer.
         </p>
         <div className="flex gap-3 justify-center">
           <Button onClick={reset}>Réessayer</Button>
-          <Button variant="outline" onClick={() => window.location.href = "/"}>
+          <Button
+            variant="outline"
+            onClick={() => (window.location.href = "/")}
+          >
             Retour à l&apos;accueil
           </Button>
         </div>
