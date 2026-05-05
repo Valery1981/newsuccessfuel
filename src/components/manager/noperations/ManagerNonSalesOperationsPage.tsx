@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -433,6 +434,35 @@ export function ManagerNonSalesOperationsPage({
                 </SelectContent>
               </Select>
             </div>
+            {/* APEX-16-final : Aperçu écriture comptable (§5.5-23) */}
+            {virementForm.tresorerie_source_id &&
+              virementForm.tresorerie_dest_id &&
+              Number(virementForm.montant) > 0 && (
+                <EcriturePreview
+                  title="Écriture qui sera générée"
+                  currency="MGA"
+                  lignes={[
+                    {
+                      libelleCompte:
+                        (tresoreries ?? []).find(
+                          (t) => t.id === virementForm.tresorerie_dest_id,
+                        )?.libelle ?? "Trésorerie destination",
+                      debit: Number(virementForm.montant),
+                      credit: 0,
+                      libelle: "Réception virement",
+                    },
+                    {
+                      libelleCompte:
+                        (tresoreries ?? []).find(
+                          (t) => t.id === virementForm.tresorerie_source_id,
+                        )?.libelle ?? "Trésorerie source",
+                      debit: 0,
+                      credit: Number(virementForm.montant),
+                      libelle: "Sortie virement",
+                    },
+                  ]}
+                />
+              )}
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDialogOpen(null)}>
                 Annuler

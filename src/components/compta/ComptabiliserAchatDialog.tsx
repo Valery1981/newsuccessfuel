@@ -23,6 +23,68 @@ import { EcriturePreview } from "./EcriturePreview";
  * Utilisable pour AchatCarburant et AchatBoutique (structure D/C identique).
  */
 
+/**
+ * Construit les lignes D/C d'un achat en fonction des montants.
+ * Logique pure exportée pour tests unitaires (APEX-12-suite).
+ *
+ * Règle § 6.1 :
+ *  - Débit `Achats` = montant facture (charge de la période)
+ *  - Crédit `Trésorerie` = total payé (sortie immédiate)
+ *  - Crédit `Fournisseur` = reste à payer (dette à terme)
+ *  - Toujours équilibré : Débit = Crédit = montant facture
+ */
+export function buildAchatLignes(params: {
+  montantFacture: number;
+  totalPaye: number;
+  libelleAchat: string;
+  libelleTresorerie: string;
+  libelleFournisseur: string;
+}): Array<{
+  libelleCompte: string;
+  debit: number;
+  credit: number;
+  libelle?: string;
+}> {
+  const {
+    montantFacture,
+    totalPaye,
+    libelleAchat,
+    libelleTresorerie,
+    libelleFournisseur,
+  } = params;
+  const credit = totalPaye;
+  const dette = montantFacture - totalPaye;
+
+  return [
+    {
+      libelleCompte: libelleAchat,
+      debit: montantFacture,
+      credit: 0,
+      libelle: "Charge de la période",
+    },
+    ...(credit > 0
+      ? [
+          {
+            libelleCompte: libelleTresorerie,
+            debit: 0,
+            credit: credit,
+            libelle: "Paiement immédiat",
+          },
+        ]
+      : []),
+    ...(dette > 0
+      ? [
+          {
+            libelleCompte: libelleFournisseur,
+            debit: 0,
+            credit: dette,
+            libelle: "Reste à payer",
+          },
+        ]
+      : []),
+  ];
+}
+
 export interface ComptabiliserAchatDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,37 +123,13 @@ export function ComptabiliserAchatDialog({
 }: ComptabiliserAchatDialogProps) {
   const [isBalanced, setIsBalanced] = useState(false);
 
-  const credit = totalPaye;
-  const dette = montantFacture - totalPaye;
-
-  const lignes = [
-    {
-      libelleCompte: libelleAchat,
-      debit: montantFacture,
-      credit: 0,
-      libelle: "Charge de la période",
-    },
-    ...(credit > 0
-      ? [
-          {
-            libelleCompte: libelleTresorerie,
-            debit: 0,
-            credit: credit,
-            libelle: "Paiement immédiat",
-          },
-        ]
-      : []),
-    ...(dette > 0
-      ? [
-          {
-            libelleCompte: libelleFournisseur,
-            debit: 0,
-            credit: dette,
-            libelle: "Reste à payer",
-          },
-        ]
-      : []),
-  ];
+  const lignes = buildAchatLignes({
+    montantFacture,
+    totalPaye,
+    libelleAchat,
+    libelleTresorerie,
+    libelleFournisseur,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

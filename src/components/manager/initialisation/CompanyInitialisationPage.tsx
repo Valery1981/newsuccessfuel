@@ -5,14 +5,22 @@ import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -437,16 +445,60 @@ export function CompanyInitialisationPage() {
         </TabsContent>
       </Tabs>
 
-      <ConfirmDialog
-        open={confirmValidate}
-        onOpenChange={setConfirmValidate}
-        title="Valider l'initialisation ?"
-        description="Cette opération est IRRÉVERSIBLE. Elle génère les A Nouveau comptables, les entrées de stock initiales et le Capital Net. Êtes-vous certain de vouloir continuer ?"
-        confirmLabel="Oui, valider définitivement"
-        cancelLabel="Annuler"
-        variant="destructive"
-        onConfirm={() => validationMutation.mutate()}
-      />
+      {/* APEX-16-final : Dialog validation avec aperçu A Nouveau (§5.5-23) */}
+      <Dialog open={confirmValidate} onOpenChange={setConfirmValidate}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Valider l&apos;initialisation ?</DialogTitle>
+            <DialogDescription>
+              Cette opération est <strong>irréversible</strong>. Elle génère les
+              A Nouveau comptables, les entrées de stock initiales et le Capital
+              Net.
+            </DialogDescription>
+          </DialogHeader>
+
+          <EcriturePreview
+            title="Aperçu de l'écriture A Nouveau"
+            description="Récapitulatif de l'équation comptable d'ouverture (§6.2 — Actif = Passif + Capital)"
+            currency="MGA"
+            lignes={[
+              {
+                libelleCompte:
+                  "Actifs (stocks + trésorerie + créances + immo.)",
+                debit: initialisation?.capital_net_calcule ?? 0,
+                credit: 0,
+                libelle: "Total des actifs initiaux",
+              },
+              {
+                libelleCompte: "Capital Net (101 + dettes initiales)",
+                debit: 0,
+                credit: initialisation?.capital_net_calcule ?? 0,
+                libelle: "Contrepartie en capital + passif",
+              },
+            ]}
+          />
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmValidate(false)}
+              disabled={validationMutation.isPending}
+            >
+              Annuler
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => validationMutation.mutate()}
+              disabled={validationMutation.isPending}
+            >
+              {validationMutation.isPending && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              Oui, valider définitivement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }

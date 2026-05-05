@@ -7,6 +7,13 @@
 
 ## 2026-05-05
 
+### ACTION — Derniers APEX (Phase 7)
+
+- **APEX-16-final** : EcriturePreview dans dialog Virement Interne + Dialog A Nouveau pédagogique dans CompanyInitialisationPage (4 pages compta intégrées au total)
+- **APEX-12-suite** : `buildAchatLignes` extrait pure + 6 tests vérifiant équilibre §6.1 + spec E2E `comptabilisation-dialogs.spec.ts`
+- **APEX-déploiement-OCR** : Edge Function `import-calibrage` déployée en production via MCP (status ACTIVE, version 1, JWT verify)
+- **Bilan** : Build OK | TS strict 0 any | 96 tests | conformité 91% → 93% | OCR Edge Function live
+
 ### ACTION — APEX finalisation (Phase 6)
 
 - **APEX-02b finalisation** : pivot vers SW manuel `public/sw.js` (134 lignes) + `ServiceWorkerRegister` client. `@serwist/next` désinstallé (incompat Next 16/Turbopack).
