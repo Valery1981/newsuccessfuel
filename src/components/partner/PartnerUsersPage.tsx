@@ -118,7 +118,6 @@ export function PartnerUsersPage() {
   const [editTarget, setEditTarget] = useState<TmSession | null>(null);
   const [resetTarget, setResetTarget] = useState<TmSession | null>(null);
   const [generatedPw, setGeneratedPw] = useState("");
-  const [generatedResetPw, setGeneratedResetPw] = useState("");
 
   // Zone + droits for create/edit
   const [selectedStations, setSelectedStations] = useState<string[]>([]);
@@ -288,7 +287,6 @@ export function PartnerUsersPage() {
       toast.success("Mot de passe réinitialisé");
       setResetTarget(null);
       resetForm.reset();
-      setGeneratedResetPw("");
     },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -424,7 +422,6 @@ export function PartnerUsersPage() {
                                 onClick={() => {
                                   setResetTarget(tm);
                                   resetForm.reset();
-                                  setGeneratedResetPw("");
                                 }}
                               >
                                 <KeyRound className="w-4 h-4 mr-2" />
@@ -717,7 +714,6 @@ export function PartnerUsersPage() {
                   size="icon"
                   onClick={() => {
                     const pw = nanoid(12);
-                    setGeneratedResetPw(pw);
                     resetForm.setValue("motDePasseTemp", pw);
                   }}
                 >

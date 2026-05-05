@@ -146,9 +146,7 @@ export function CompanyInitialisationPage() {
   const { data: openingBalanceSummary } = useQuery({
     queryKey: ["opening-balance-summary", entreprise?.id],
     queryFn: () =>
-      entreprise
-        ? initialisationService.getOpeningBalanceSummary(entreprise.id)
-        : null,
+      entreprise ? initialisationService.getOpeningBalanceSummary() : null,
     enabled: !!entreprise?.id,
   });
 

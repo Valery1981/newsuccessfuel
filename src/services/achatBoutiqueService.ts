@@ -1,5 +1,5 @@
-import { createClient } from "@/utils/supabase/client";
 import type { AchatStatut } from "@/types/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
@@ -68,9 +68,7 @@ export const achatBoutiqueService = {
     if (stationIds.length === 0) return [];
     const { data, error } = await supabase
       .from("achats_boutique")
-      .select(
-        "*, stations!station_id(nom), tiers!fournisseur_id(nom)"
-      )
+      .select("*, stations!station_id(nom), tiers!fournisseur_id(nom)")
       .in("station_id", stationIds)
       .order("created_at", { ascending: false })
       .limit(100);
@@ -108,7 +106,7 @@ export const achatBoutiqueService = {
   async creerAchat(data: NouvelAchatBoutiqueData): Promise<AchatBoutique> {
     const montantTotal = data.lignes.reduce(
       (acc, l) => acc + l.quantite * l.prix_achat_unitaire,
-      0
+      0,
     );
 
     const { data: achat, error } = await supabase
@@ -162,7 +160,7 @@ export const achatBoutiqueService = {
     return achatRow;
   },
 
-  async mouvementerStock(achatId: string, _mouvementeParId: string): Promise<void> {
+  async mouvementerStock(achatId: string): Promise<void> {
     const { data: lignes, error: lignesError } = await supabase
       .from("lignes_achat_boutique")
       .select("article_id, quantite, prix_achat_unitaire")

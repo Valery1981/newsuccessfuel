@@ -1,19 +1,24 @@
 "use client";
 
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createClient } from "@/utils/supabase/client";
-import { useAuthStore } from "@/stores/authStore";
-import { ReportLayout } from "@/components/reports/ReportLayout";
-import { ReportFilters, type ReportFilterValues } from "@/components/reports/ReportFilters";
-import { useReportStations, defaultFilterValues } from "@/hooks/useReportStations";
-import { formatCurrency } from "@/lib/utils";
-import { exportCsv } from "@/lib/exportCsv";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { PageLoading } from "@/components/common/LoadingSpinner";
+import {
+  ReportFilters,
+  type ReportFilterValues,
+} from "@/components/reports/ReportFilters";
+import { ReportLayout } from "@/components/reports/ReportLayout";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import {
+  defaultFilterValues,
+  useReportStations,
+} from "@/hooks/useReportStations";
+import { exportCsv } from "@/lib/exportCsv";
+import { cn, formatCurrency } from "@/lib/utils";
+import { useAuthStore } from "@/stores/authStore";
+import { createClient } from "@/utils/supabase/client";
+import { useQuery } from "@tanstack/react-query";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 const supabase = createClient();
 
@@ -25,7 +30,9 @@ interface CompteLigne {
 
 export function CompteResultatReport() {
   const { entreprise } = useAuthStore();
-  const [filters, setFilters] = useState<ReportFilterValues>(defaultFilterValues());
+  const [filters, setFilters] = useState<ReportFilterValues>(
+    defaultFilterValues(),
+  );
   const { data: stations = [] } = useReportStations();
 
   const { data: lignes = [], isLoading } = useQuery<CompteLigne[]>({
@@ -42,13 +49,23 @@ export function CompteResultatReport() {
       const { data, error } = await query;
       if (error) throw error;
 
-      const map: Record<string, { libelle: string; debit: number; credit: number; classe: "charges" | "produits" }> = {};
-      for (const e of (data ?? [])) {
+      const map: Record<
+        string,
+        {
+          libelle: string;
+          debit: number;
+          credit: number;
+          classe: "charges" | "produits";
+        }
+      > = {};
+      for (const e of data ?? []) {
         const r = e as Record<string, unknown>;
         const num = (r.numero_compte as string) ?? "";
         if (!num.startsWith("6") && !num.startsWith("7")) continue;
         const libelle = (r.libelle_compte as string) ?? "—";
-        const classe: "charges" | "produits" = num.startsWith("6") ? "charges" : "produits";
+        const classe: "charges" | "produits" = num.startsWith("6")
+          ? "charges"
+          : "produits";
         if (!map[num]) map[num] = { libelle, debit: 0, credit: 0, classe };
         map[num].debit += (r.debit as number) ?? 0;
         map[num].credit += (r.credit as number) ?? 0;
@@ -58,7 +75,8 @@ export function CompteResultatReport() {
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([, v]) => ({
           libelle_compte: v.libelle,
-          solde: v.classe === "charges" ? v.debit - v.credit : v.credit - v.debit,
+          solde:
+            v.classe === "charges" ? v.debit - v.credit : v.credit - v.debit,
           classe: v.classe,
         }))
         .filter((l) => l.solde > 0);
@@ -77,8 +95,8 @@ export function CompteResultatReport() {
   function handleExport() {
     exportCsv(
       lignes.map((l) => ({
-        "Classe": l.classe === "charges" ? "Charges" : "Produits",
-        "Libellé": l.libelle_compte,
+        Classe: l.classe === "charges" ? "Charges" : "Produits",
+        Libellé: l.libelle_compte,
         "Montant (Ar)": l.solde,
       })),
       `compte-resultat-${filters.dateDebut}-${filters.dateFin}`,
@@ -89,27 +107,42 @@ export function CompteResultatReport() {
     const total = data.reduce((a, l) => a + l.solde, 0);
     return (
       <div className="space-y-1">
-        <h3 className={cn("text-sm font-bold uppercase tracking-wide", color)}>{label}</h3>
+        <h3 className={cn("text-sm font-bold uppercase tracking-wide", color)}>
+          {label}
+        </h3>
         <div className="rounded-md border overflow-hidden">
           <Table>
             <TableBody>
               {data.length === 0 ? (
                 <TableRow>
-                  <TableCell className="text-muted-foreground text-sm py-4 text-center" colSpan={2}>
+                  <TableCell
+                    className="text-muted-foreground text-sm py-4 text-center"
+                    colSpan={2}
+                  >
                     Aucun mouvement
                   </TableCell>
                 </TableRow>
               ) : (
                 data.map((l, i) => (
                   <TableRow key={i}>
-                    <TableCell className="text-sm">{l.libelle_compte}</TableCell>
-                    <TableCell className="text-right text-sm font-medium">{formatCurrency(l.solde)}</TableCell>
+                    <TableCell className="text-sm">
+                      {l.libelle_compte}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {formatCurrency(l.solde)}
+                    </TableCell>
                   </TableRow>
                 ))
               )}
               <TableRow className="bg-muted/60 font-semibold border-t">
-                <TableCell className={cn("text-sm", color)}>Total {label}</TableCell>
-                <TableCell className={cn("text-right text-sm font-bold", color)}>{formatCurrency(total)}</TableCell>
+                <TableCell className={cn("text-sm", color)}>
+                  Total {label}
+                </TableCell>
+                <TableCell
+                  className={cn("text-right text-sm font-bold", color)}
+                >
+                  {formatCurrency(total)}
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -125,7 +158,11 @@ export function CompteResultatReport() {
       onExport={handleExport}
     >
       <div className="mt-4 space-y-4">
-        <ReportFilters stations={stations} values={filters} onChange={setFilters} />
+        <ReportFilters
+          stations={stations}
+          values={filters}
+          onChange={setFilters}
+        />
 
         {isLoading ? (
           <PageLoading />
@@ -140,7 +177,9 @@ export function CompteResultatReport() {
             <div
               className={cn(
                 "flex items-center justify-between rounded-lg border-2 px-4 py-4",
-                isBenefice ? "border-green-300 bg-green-50" : "border-red-300 bg-red-50",
+                isBenefice
+                  ? "border-green-300 bg-green-50"
+                  : "border-red-300 bg-red-50",
               )}
             >
               <div className="flex items-center gap-3">
@@ -150,9 +189,12 @@ export function CompteResultatReport() {
                   <TrendingDown className="w-6 h-6 text-red-600" />
                 )}
                 <div>
-                  <p className="text-sm font-semibold text-foreground">Résultat net</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    Résultat net
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Produits ({formatCurrency(totalProduits)}) − Charges ({formatCurrency(totalCharges)})
+                    Produits ({formatCurrency(totalProduits)}) − Charges (
+                    {formatCurrency(totalCharges)})
                   </p>
                 </div>
               </div>
@@ -163,12 +205,15 @@ export function CompteResultatReport() {
                     isBenefice ? "text-green-700" : "text-red-700",
                   )}
                 >
-                  {isBenefice ? "+" : ""}{formatCurrency(resultatNet)}
+                  {isBenefice ? "+" : ""}
+                  {formatCurrency(resultatNet)}
                 </p>
                 <Badge
                   className={cn(
                     "text-xs mt-1",
-                    isBenefice ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800",
+                    isBenefice
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800",
                   )}
                 >
                   {isBenefice ? "Bénéfice" : "Perte"}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   CreditCard,
   Loader2,
@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { useRealtimeStock } from "@/hooks/useRealtimeStock";
 import { buildTicketPrintHtml, openPrintWindow } from "@/lib/printUtils";
 import { formatCurrency } from "@/lib/utils";
 import { stationService } from "@/services/stationService";
@@ -62,7 +63,9 @@ interface ShiftBoutique {
 
 export function ManagerShopSalesPage() {
   const { entreprise } = useAuthStore();
-  const queryClient = useQueryClient();
+
+  // Enable real-time stock updates on sales
+  useRealtimeStock();
 
   const [selectedStationId, setSelectedStationId] = useState("");
   const [activeShift, setActiveShift] = useState<ShiftBoutique | null>(null);
@@ -93,13 +96,13 @@ export function ManagerShopSalesPage() {
     queryKey: ["articles-pos", entreprise?.id, searchQuery],
     queryFn: async () => {
       if (!entreprise || !searchQuery || searchQuery.length < 2) return [];
-      // Récupérer les articles
+      // Récupérer les articles par nom OU code-barres
       const { data: articlesData } = await supabase
         .from("articles")
-        .select("id, nom, famille, unite, is_active")
+        .select("id, nom, famille, unite, is_active, code_barres")
         .eq("entreprise_id", entreprise.id)
         .eq("is_active", true)
-        .ilike("nom", `%${searchQuery}%`)
+        .or(`nom.ilike.%${searchQuery}%,code_barres.ilike.%${searchQuery}%`)
         .limit(10);
       if (!articlesData?.length) return [];
 

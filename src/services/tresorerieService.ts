@@ -1,9 +1,8 @@
-import { createClient } from "@/utils/supabase/client";
 import type { Database } from "@/types/supabase";
+import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
-type TresorerieInsert = Database["public"]["Tables"]["tresoreries"]["Insert"];
 type TresorerieUpdate = Database["public"]["Tables"]["tresoreries"]["Update"];
 
 export const tresorerieService = {
@@ -18,7 +17,7 @@ export const tresorerieService = {
       {
         p_entreprise_id: data.entreprise_id,
         p_type: data.type,
-      }
+      },
     );
     if (numError) throw numError;
 

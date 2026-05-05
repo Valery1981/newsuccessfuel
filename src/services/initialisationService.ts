@@ -174,7 +174,7 @@ export const initialisationService = {
     };
   },
 
-  async getOpeningBalanceSummary(_entrepriseId: string) {
+  async getOpeningBalanceSummary() {
     // This RPC function may not exist yet - return empty structure for now
     // TODO: Implement compute_opening_balance_summary RPC in Supabase
     return {

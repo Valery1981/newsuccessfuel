@@ -279,7 +279,7 @@ export function AchatBoutiquePage() {
 
   const mouvementerMutation = useMutation({
     mutationFn: (achatId: string) =>
-      achatBoutiqueService.mouvementerStock(achatId, compte?.id ?? ""),
+      achatBoutiqueService.mouvementerStock(achatId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-boutique"] });
       setDialogConfirmMouv(null);
