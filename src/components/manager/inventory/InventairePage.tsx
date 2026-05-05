@@ -100,11 +100,18 @@ function EcartBadge({ ecart }: { ecart: number | null }) {
 
 // ── Composant principal ────────────────────────────────────────────────────────
 
-export function InventairePage() {
+export interface InventairePageProps {
+  /** Onglet initial — permet aux routes /inventaire-carburant et /inventaire-boutique de pointer directement (§6.4) */
+  initialTab?: InventaireType;
+}
+
+export function InventairePage({
+  initialTab = "carburant",
+}: InventairePageProps = {}) {
   const { compte, entreprise } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<InventaireType>("carburant");
+  const [activeTab, setActiveTab] = useState<InventaireType>(initialTab);
   const [dialogNouvel, setDialogNouvel] = useState(false);
   const [dialogFormulaire, setDialogFormulaire] = useState(false);
   const [dialogRegularisation, setDialogRegularisation] = useState(false);

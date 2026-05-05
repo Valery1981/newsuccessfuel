@@ -9,16 +9,16 @@ test.describe("POS Boutique — interface de vente", () => {
     await expect(page).toHaveURL(/\/manager\/dashboard/, { timeout: 15_000 });
   });
 
-  test("page vente-boutique accessible", async ({ page }) => {
-    await page.goto("/manager/traitement/vente-boutique");
-    await expect(page).toHaveURL(/vente-boutique/);
+  test("page pos-boutique accessible", async ({ page }) => {
+    await page.goto("/manager/traitements/pos-boutique");
+    await expect(page).toHaveURL(/pos-boutique/);
     await expect(
       page.getByRole("heading", { name: /vente.*boutique|boutique|point de vente/i })
     ).toBeVisible({ timeout: 10_000 });
   });
 
   test("recherche article visible dans le POS", async ({ page }) => {
-    await page.goto("/manager/traitement/vente-boutique");
+    await page.goto("/manager/traitements/pos-boutique");
     await expect(
       page.locator('[data-testid="pos-search"], [placeholder*="article" i], [placeholder*="recherch" i]').first()
     ).toBeVisible({ timeout: 10_000 });

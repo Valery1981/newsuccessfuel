@@ -65,38 +65,43 @@ const navSections: NavSection[] = [
         icon: Settings,
         children: [
           {
-            href: "/manager/structure/comptes",
+            href: "/manager/parametres/comptes",
             label: "Plan comptable",
             icon: ClipboardList,
           },
-          { href: "/manager/structure/tiers", label: "Tiers", icon: Users },
+          { href: "/manager/parametres/tiers", label: "Tiers", icon: Users },
           {
-            href: "/manager/structure/articles",
+            href: "/manager/parametres/articles",
             label: "Articles / Produits",
             icon: Package,
           },
           {
-            href: "/manager/structure/carburants",
+            href: "/manager/parametres/carburants",
             label: "Carburants",
             icon: Fuel,
           },
           {
-            href: "/manager/structure/tresorerie",
+            href: "/manager/parametres/prix-carburant",
+            label: "Prix Carburant",
+            icon: Fuel,
+          },
+          {
+            href: "/manager/parametres/tresorerie",
             label: "Trésorerie",
             icon: ShoppingCart,
           },
           {
-            href: "/manager/structure/camions",
+            href: "/manager/parametres/camions",
             label: "Camions",
             icon: Building2,
           },
           {
-            href: "/manager/structure/services",
+            href: "/manager/parametres/services",
             label: "Services",
             icon: Wrench,
           },
           {
-            href: "/manager/structure/objectifs",
+            href: "/manager/parametres/objectifs",
             label: "Objectifs & Seuils",
             icon: BarChart3,
           },
@@ -113,37 +118,37 @@ const navSections: NavSection[] = [
         icon: ShoppingCart,
         children: [
           {
-            href: "/manager/traitement/achat-carburant",
+            href: "/manager/traitements/achat-carburant",
             label: "Achat Carburant",
             icon: Fuel,
           },
           {
-            href: "/manager/traitement/vente-carburant",
+            href: "/manager/traitements/shift-carburant",
             label: "Vente Carburant",
             icon: Fuel,
           },
           {
-            href: "/manager/traitement/achat-boutique",
+            href: "/manager/traitements/achat-boutique",
             label: "Achat Boutique",
             icon: Package,
           },
           {
-            href: "/manager/traitement/vente-boutique",
+            href: "/manager/traitements/pos-boutique",
             label: "Vente Boutique (POS)",
             icon: ShoppingCart,
           },
           {
-            href: "/manager/traitement/inventaire",
+            href: "/manager/traitements/inventaire",
             label: "Inventaires",
             icon: ClipboardList,
           },
           {
-            href: "/manager/traitement/operations",
+            href: "/manager/traitements/operations",
             label: "Opérations",
             icon: Settings,
           },
           {
-            href: "/manager/traitement/doleances",
+            href: "/manager/traitements/doleances",
             label: "Doléances",
             icon: AlertCircle,
             badge: 0,
@@ -546,27 +551,27 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const pageTitle = (() => {
     if (pathname.includes("/dashboard")) return "Tableau de bord";
     if (pathname.includes("/stations")) return "Mes stations";
-    if (pathname.includes("/structure/comptes")) return "Plan comptable";
-    if (pathname.includes("/structure/tiers")) return "Tiers";
-    if (pathname.includes("/structure/articles")) return "Articles / Produits";
-    if (pathname.includes("/structure/carburants")) return "Carburants";
-    if (pathname.includes("/structure/tresorerie")) return "Trésorerie";
-    if (pathname.includes("/structure/camions")) return "Camions";
-    if (pathname.includes("/structure/services")) return "Services";
-    if (pathname.includes("/structure/objectifs")) return "Objectifs & Seuils";
+    if (pathname.includes("/parametres/comptes")) return "Plan comptable";
+    if (pathname.includes("/parametres/tiers")) return "Tiers";
+    if (pathname.includes("/parametres/articles")) return "Articles / Produits";
+    if (pathname.includes("/parametres/carburants")) return "Carburants";
+    if (pathname.includes("/parametres/tresorerie")) return "Trésorerie";
+    if (pathname.includes("/parametres/camions")) return "Camions";
+    if (pathname.includes("/parametres/services")) return "Services";
+    if (pathname.includes("/parametres/objectifs")) return "Objectifs & Seuils";
     if (pathname.includes("/structure")) return "Structure";
     if (pathname.includes("/initialisation")) return "Initialisation";
-    if (pathname.includes("/traitement/achat-carburant"))
+    if (pathname.includes("/traitements/achat-carburant"))
       return "Achat Carburant";
-    if (pathname.includes("/traitement/vente-carburant"))
+    if (pathname.includes("/traitements/shift-carburant"))
       return "Vente Carburant";
-    if (pathname.includes("/traitement/achat-boutique"))
+    if (pathname.includes("/traitements/achat-boutique"))
       return "Achat Boutique";
-    if (pathname.includes("/traitement/vente-boutique"))
+    if (pathname.includes("/traitements/pos-boutique"))
       return "Vente Boutique (POS)";
-    if (pathname.includes("/traitement/inventaire")) return "Inventaires";
-    if (pathname.includes("/traitement/operations")) return "Opérations";
-    if (pathname.includes("/traitement/doleances")) return "Doléances";
+    if (pathname.includes("/traitements/inventaire")) return "Inventaires";
+    if (pathname.includes("/traitements/operations")) return "Opérations";
+    if (pathname.includes("/traitements/doleances")) return "Doléances";
     if (pathname.includes("/traitement")) return "Traitement";
     if (pathname.includes("/rapports")) return "Rapports";
     if (pathname.includes("/users")) return "Utilisateurs";

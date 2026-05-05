@@ -1,4 +1,5 @@
 import type {
+  Database,
   InventaireStatut,
   InventaireType,
   MotifEcart,
@@ -204,18 +205,20 @@ export const inventaireService = {
     const lignes = cuves.map((cuve) => ({
       inventaire_id: inventaireId,
       cuve_id: cuve.id,
-      stock_theorique_litres: cuve.stock_actuel_litres,
+      stock_theorique_litres: cuve.stock_actuel_litres ?? 0,
       jauge_reelle_cm: 0,
       volume_reel_litres: 0,
-      cmup: cuve.cmup,
+      cmup: cuve.cmup ?? 0,
       motif: null,
       responsable_id: null,
       ecriture_id: null,
     }));
 
+    type LigneCarburantInsert =
+      Database["public"]["Tables"]["lignes_inventaire_carburant"]["Insert"];
     const { error } = await supabase
       .from("lignes_inventaire_carburant")
-      .insert(lignes as any[]);
+      .insert(lignes satisfies LigneCarburantInsert[]);
     if (error) throw error;
   },
 
@@ -245,7 +248,7 @@ export const inventaireService = {
         inventaire_id: inventaireId,
         article_id: r.article_id as string,
         stock_theorique: r.quantite as number,
-        quantite_reelle: null,
+        quantite_reelle: 0,
         cmup: r.cmup as number,
         motif: null,
         motif_detail: null,
@@ -254,9 +257,11 @@ export const inventaireService = {
       };
     });
 
+    type LigneBoutiqueInsert =
+      Database["public"]["Tables"]["lignes_inventaire_boutique"]["Insert"];
     const { error } = await supabase
       .from("lignes_inventaire_boutique")
-      .insert(lignes as any[]);
+      .insert(lignes satisfies LigneBoutiqueInsert[]);
     if (error) throw error;
   },
 

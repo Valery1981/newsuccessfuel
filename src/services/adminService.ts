@@ -229,9 +229,7 @@ export const adminService = {
   },
 
   async getDepenses(): Promise<DepensePlateforme[]> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from("depenses_plateforme")
       .select("*")
       .order("date_depense", { ascending: false });
@@ -247,9 +245,7 @@ export const adminService = {
     devise?: string;
     created_by?: string;
   }): Promise<DepensePlateforme> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const sb = supabase as any;
-    const { data, error } = await sb
+    const { data, error } = await supabase
       .from("depenses_plateforme")
       .insert(payload)
       .select("*")

@@ -10,7 +10,7 @@ test.describe("Achat carburant — BL / Factures", () => {
   });
 
   test("page achat-carburant accessible", async ({ page }) => {
-    await page.goto("/manager/traitement/achat-carburant");
+    await page.goto("/manager/traitements/achat-carburant");
     await expect(page).toHaveURL(/achat-carburant/);
     await expect(
       page.getByRole("heading", { name: /achat.*carburant/i })
@@ -18,7 +18,7 @@ test.describe("Achat carburant — BL / Factures", () => {
   });
 
   test("onglets BL/Factures et Nouvel achat visibles", async ({ page }) => {
-    await page.goto("/manager/traitement/achat-carburant");
+    await page.goto("/manager/traitements/achat-carburant");
     await expect(
       page.getByRole("tab", { name: /BL|facture/i }).first()
     ).toBeVisible({ timeout: 10_000 });

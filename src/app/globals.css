@@ -74,6 +74,14 @@
   --color-bg2: var(--bg2);
   --color-bg3: var(--bg3);
   --color-bg4: var(--bg4);
+  /* Alias §4 rules.md (palette officielle) */
+  --color-or: var(--brand);
+  --color-or-light: var(--brand-light);
+  --color-blu: var(--chart-2);
+  --color-grn: var(--chart-3);
+  --color-gold: var(--chart-4);
+  --color-txt2: var(--txt2);
+  --color-brd: var(--border);
 }
 
 /* ─── Corporate dark theme (always-on) ─── */

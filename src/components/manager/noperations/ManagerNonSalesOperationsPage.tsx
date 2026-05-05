@@ -73,10 +73,27 @@ interface Operation {
   is_central: boolean;
 }
 
-export function ManagerNonSalesOperationsPage() {
+export interface ManagerNonSalesOperationsPageProps {
+  /** Ouvre directement le dialog d'une opération (pour routes dédiées §5.1) */
+  initialDialog?:
+    | "virement-interne"
+    | "encaissement-creances"
+    | "reglement-dettes"
+    | "charges-courantes"
+    | "salaires"
+    | "charges-fiscales"
+    | "operations-gerant"
+    | "immobilisations";
+}
+
+export function ManagerNonSalesOperationsPage({
+  initialDialog,
+}: ManagerNonSalesOperationsPageProps = {}) {
   const { entreprise } = useAuthStore();
   const queryClient = useQueryClient();
-  const [dialogOpen, setDialogOpen] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState<string | null>(
+    initialDialog ?? null,
+  );
 
   const { data: tresoreries } = useQuery({
     queryKey: ["tresoreries", entreprise?.id],

@@ -76,7 +76,7 @@ export function ManagerStockTransferPage() {
       const { data } = await supabase
         .from("transferts_stock")
         .select(
-          "id, entreprise_id, station_origine_id, station_destination_id, article_id, quantite, cmup_origine, date_transfert",
+          "id, entreprise_id, station_origine_id, station_destination_id, article_id, quantite, cmup_origine, date_transfert, articles(nom)",
         )
         .eq("entreprise_id", entreprise.id)
         .order("date_transfert", { ascending: false })
@@ -351,22 +351,33 @@ export function ManagerStockTransferPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {(transferts ?? []).map((t: any) => (
-                    <TableRow key={t.id}>
-                      <TableCell className="text-sm">
-                        {formatDate(t.date_transfert)}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {t.articles?.nom ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {t.quantite}
-                      </TableCell>
-                      <TableCell className="text-right text-sm">
-                        {formatCurrency(t.valeur_transfert)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {(transferts ?? []).map((t) => {
+                    const articleRel = (
+                      t as unknown as {
+                        articles: { nom: string } | { nom: string }[] | null;
+                      }
+                    ).articles;
+                    const articleNom = Array.isArray(articleRel)
+                      ? articleRel[0]?.nom
+                      : articleRel?.nom;
+                    const valeur = Number(t.quantite) * Number(t.cmup_origine);
+                    return (
+                      <TableRow key={t.id}>
+                        <TableCell className="text-sm">
+                          {formatDate(t.date_transfert)}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {articleNom ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {t.quantite}
+                        </TableCell>
+                        <TableCell className="text-right text-sm">
+                          {formatCurrency(valeur)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               {(transferts ?? []).length === 0 && (

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -67,7 +67,6 @@ export function LoginPage() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { compte, isInitialized } = useAuthStore();
-  const passwordInputRef = useRef<HTMLInputElement>(null);
 
   // Redirection si l'utilisateur arrive sur la page login déjà authentifié
   useEffect(() => {
@@ -75,13 +74,6 @@ export function LoginPage() {
       router.replace(getPostLoginPath(compte));
     }
   }, [isInitialized, compte, router]);
-
-  // Manually update input type for password visibility
-  useEffect(() => {
-    if (passwordInputRef.current) {
-      passwordInputRef.current.type = showPassword ? "text" : "password";
-    }
-  }, [showPassword]);
 
   const {
     register,
@@ -140,19 +132,13 @@ export function LoginPage() {
             </Label>
             <div className="relative">
               <Input
-                ref={(e) => {
-                  register("password").ref(e);
-                  passwordInputRef.current = e;
-                }}
                 id="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 placeholder="••••••••"
                 autoComplete="current-password"
                 data-testid="password-input"
                 className="bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:border-amber-500 pr-10"
-                onChange={register("password").onChange}
-                onBlur={register("password").onBlur}
-                name="password"
+                {...register("password")}
               />
               <button
                 type="button"
