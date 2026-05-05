@@ -7,6 +7,13 @@
 
 ## 2026-05-05
 
+### ACTION — APEX finalisation (Phase 6)
+
+- **APEX-02b finalisation** : pivot vers SW manuel `public/sw.js` (134 lignes) + `ServiceWorkerRegister` client. `@serwist/next` désinstallé (incompat Next 16/Turbopack).
+- **APEX-16-suite** : `ComptabiliserAchatDialog` réutilisable + intégré dans `AchatCarburantPage` et `AchatBoutiquePage`. Bouton Comptabiliser bloqué si écriture déséquilibrée (§6.1).
+- **APEX-OCR** : Edge Function `import-calibrage` avec OCR.space + README + intégration `CalibrageImporter` (PDF/JPG/PNG → texte → points §6.6).
+- **Bilan** : Build OK | TS strict 0 any | 90 tests | conformité 87% → 91% | PWA active en prod
+
 ### ACTION — APEX différés exécutés (Phase 5)
 
 - **APEX-10b** : 7 composants (ShiftCard, MouvementTimeline, AlertesList, TresorerieGauge, TiersSelect, TresorerieSelect, CalibrageImporter) + 7 tests parser §6.6

@@ -3,6 +3,7 @@
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ComptabiliserAchatDialog } from "@/components/compta/ComptabiliserAchatDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -97,6 +98,9 @@ export function AchatCarburantPage() {
   const [nouvelAchatStep, setNouvelAchatStep] = useState<1 | 2 | 3 | 4>(1);
   const [currentAchatId, setCurrentAchatId] = useState<string | null>(null);
   const [detailAchat, setDetailAchat] = useState<AchatCarburant | null>(null);
+  // APEX-16-suite : aperçu écriture avant comptabilisation
+  const [previewComptaAchat, setPreviewComptaAchat] =
+    useState<AchatCarburant | null>(null);
   const [selectedFournisseurId, setSelectedFournisseurId] =
     useState<string>("");
 
@@ -374,6 +378,7 @@ export function AchatCarburantPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
       toast.success("Achat comptabilisé — Grand Livre mis à jour");
+      setPreviewComptaAchat(null);
     },
     onError: (e) =>
       toast.error("Erreur comptabilisation : " + (e as Error).message),
@@ -472,9 +477,7 @@ export function AchatCarburantPage() {
                                 size="sm"
                                 variant="outline"
                                 className="text-xs"
-                                onClick={() =>
-                                  comptabiliserMutation.mutate(achat.id)
-                                }
+                                onClick={() => setPreviewComptaAchat(achat)}
                                 disabled={comptabiliserMutation.isPending}
                               >
                                 Comptabiliser
@@ -957,6 +960,26 @@ export function AchatCarburantPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* APEX-16-suite : Dialog aperçu écriture comptable avant comptabilisation */}
+      {previewComptaAchat && (
+        <ComptabiliserAchatDialog
+          open={!!previewComptaAchat}
+          onOpenChange={(open) => !open && setPreviewComptaAchat(null)}
+          description={`BC ${previewComptaAchat.numero_bc}${previewComptaAchat.numero_bl ? ` — BL ${previewComptaAchat.numero_bl}` : ""}${previewComptaAchat.fournisseur_nom ? ` — ${previewComptaAchat.fournisseur_nom}` : ""}`}
+          montantFacture={previewComptaAchat.montant_facture}
+          totalPaye={previewComptaAchat.total_paye}
+          libelleAchat="Achats carburant"
+          libelleTresorerie="Trésorerie (caisse/banque)"
+          libelleFournisseur={
+            previewComptaAchat.fournisseur_nom
+              ? `Fournisseur ${previewComptaAchat.fournisseur_nom}`
+              : "Fournisseur"
+          }
+          onConfirm={() => comptabiliserMutation.mutate(previewComptaAchat.id)}
+          isPending={comptabiliserMutation.isPending}
+        />
+      )}
     </PageContainer>
   );
 }

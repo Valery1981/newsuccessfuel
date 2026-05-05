@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Upload } from "lucide-react";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/utils/supabase/client";
 
 /**
  * Importateur de tableau de calibrage cuves (§5.5-09 + §6.6 rules.md).
@@ -119,6 +120,8 @@ export function CalibrageImporter({
 }: CalibrageImporterProps) {
   const [text, setText] = useState("");
   const [points, setPoints] = useState<CalibragePoint[]>([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrError, setOcrError] = useState<string | null>(null);
 
   const handleParse = (raw: string) => {
     const parsed = parseCalibrageText(raw);
@@ -128,9 +131,56 @@ export function CalibrageImporter({
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const content = await file.text();
-    setText(content);
-    handleParse(content);
+    setOcrError(null);
+
+    const isText =
+      /\.(?:csv|txt|tsv)$/i.test(file.name) || file.type.startsWith("text/");
+
+    if (isText) {
+      const content = await file.text();
+      setText(content);
+      handleParse(content);
+      return;
+    }
+
+    // PDF/image → Edge Function OCR (APEX-OCR)
+    setOcrLoading(true);
+    try {
+      const supabase = createClient();
+      const fd = new FormData();
+      fd.append("file", file);
+      type OcrResponse = {
+        success: boolean;
+        points: CalibragePoint[];
+        error?: string;
+      };
+      const { data, error } = await supabase.functions.invoke<OcrResponse>(
+        "import-calibrage",
+        { body: fd },
+      );
+      if (error) throw error;
+      if (!data?.success) {
+        throw new Error(data?.error ?? "OCR a échoué");
+      }
+      const remapped: CalibragePoint[] = (data.points ?? []).map(
+        (p: CalibragePoint) => ({
+          hauteur_cm: p.hauteur_cm,
+          volume_litres: p.volume_litres,
+          sourceLine: p.sourceLine ?? 0,
+          errors: p.errors,
+        }),
+      );
+      setPoints(remapped);
+      setText(
+        remapped
+          .map((p: CalibragePoint) => `${p.hauteur_cm}\t${p.volume_litres}`)
+          .join("\n"),
+      );
+    } catch (err) {
+      setOcrError((err as Error).message ?? "Erreur lors de l'extraction OCR");
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const handleApply = () => {
@@ -155,15 +205,31 @@ export function CalibrageImporter({
       <CardContent className="space-y-3">
         <div className="space-y-2">
           <Label htmlFor="calibrage-file">
-            Fichier CSV / TXT (hauteur, volume)
+            Fichier CSV / TXT / PDF / image (hauteur, volume)
           </Label>
           <input
             id="calibrage-file"
             type="file"
-            accept=".csv,.txt,.tsv,text/plain,text/csv"
+            accept=".csv,.txt,.tsv,.pdf,.jpg,.jpeg,.png,.webp,text/plain,text/csv,application/pdf,image/*"
             onChange={handleFile}
-            className="block text-sm w-full file:mr-3 file:py-1 file:px-3 file:rounded-md file:border file:border-input file:bg-background file:text-sm file:font-medium hover:file:bg-muted"
+            disabled={ocrLoading}
+            className="block text-sm w-full file:mr-3 file:py-1 file:px-3 file:rounded-md file:border file:border-input file:bg-background file:text-sm file:font-medium hover:file:bg-muted disabled:opacity-50"
           />
+          {ocrLoading && (
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+              Extraction OCR en cours…
+            </p>
+          )}
+          {ocrError && (
+            <p className="text-xs text-destructive flex items-start gap-1.5">
+              <AlertTriangle
+                className="h-3 w-3 mt-0.5 shrink-0"
+                aria-hidden="true"
+              />
+              {ocrError}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">

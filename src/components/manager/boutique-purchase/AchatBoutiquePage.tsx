@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import { ComptabiliserAchatDialog } from "@/components/compta/ComptabiliserAchatDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -1029,41 +1030,35 @@ export function AchatBoutiquePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog Confirmation comptabilisation */}
-      <Dialog
-        open={!!dialogConfirmCompt}
-        onOpenChange={() => setDialogConfirmCompt(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la comptabilisation</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground mt-2">
-            Cette action va marquer l&apos;achat comme comptabilisé.
-          </p>
-          <DialogFooter className="mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setDialogConfirmCompt(null)}
-            >
-              Annuler
-            </Button>
-            <Button
-              className="bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => {
-                if (dialogConfirmCompt)
-                  comptabiliserMutation.mutate(dialogConfirmCompt);
-              }}
-              disabled={comptabiliserMutation.isPending}
-            >
-              {comptabiliserMutation.isPending && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              Confirmer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* APEX-16-suite : Dialog comptabilisation avec aperçu écriture comptable */}
+      {(() => {
+        const achatToComptabiliser = dialogConfirmCompt
+          ? (achats ?? []).find((a) => a.id === dialogConfirmCompt)
+          : null;
+        if (!achatToComptabiliser) return null;
+        const fournisseurNom =
+          (
+            achatToComptabiliser as unknown as {
+              tiers?: { nom?: string } | null;
+            }
+          ).tiers?.nom ?? null;
+        return (
+          <ComptabiliserAchatDialog
+            open={!!dialogConfirmCompt}
+            onOpenChange={(open) => !open && setDialogConfirmCompt(null)}
+            description={`Facture ${achatToComptabiliser.numero_facture ?? "N/A"}${fournisseurNom ? ` — ${fournisseurNom}` : ""}`}
+            montantFacture={achatToComptabiliser.montant_total ?? 0}
+            totalPaye={achatToComptabiliser.montant_cash ?? 0}
+            libelleAchat="Achats boutique"
+            libelleTresorerie="Trésorerie (caisse/banque)"
+            libelleFournisseur={
+              fournisseurNom ? `Fournisseur ${fournisseurNom}` : "Fournisseur"
+            }
+            onConfirm={() => comptabiliserMutation.mutate(dialogConfirmCompt!)}
+            isPending={comptabiliserMutation.isPending}
+          />
+        );
+      })()}
     </PageContainer>
   );
 }
