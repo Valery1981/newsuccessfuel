@@ -1,5 +1,6 @@
 "use client";
 
+import { FusedLogo } from "@/components/common/FusedLogo";
 import { NotificationCenter } from "@/components/messaging/NotificationCenter";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
@@ -213,22 +214,7 @@ function SidebarContent({ onNavigate }: SidebarProps) {
         style={{ borderBottom: "0.5px solid var(--border)" }}
       >
         <div className="flex items-center gap-[9px]">
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{
-              width: 32,
-              height: 32,
-              background: "var(--brand)",
-              borderRadius: 8,
-            }}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              style={{ width: 18, height: 18, fill: "white" }}
-            >
-              <path d="M19.77 7.23l.01-.01-3.72-3.72L15 4.56l2.11 2.11c-.94.36-1.61 1.26-1.61 2.33a2.5 2.5 0 002.5 2.5c.36 0 .69-.08 1-.21v7.21a1 1 0 01-2 0V14a2 2 0 00-2-2h-1V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16h10v-7.5h1.5v5a2.5 2.5 0 005 0V9c0-.69-.28-1.32-.73-1.77zM18 9.5a1 1 0 110-2 1 1 0 010 2zM8 17H6v-2h2v2zm0-4H6v-2h2v2zm0-4H6V7h2v2zm4 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V7h2v2z" />
-            </svg>
-          </div>
+          <FusedLogo size={32} />
           <div className="min-w-0 flex-1">
             <p
               style={{

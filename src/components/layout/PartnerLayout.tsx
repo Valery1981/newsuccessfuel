@@ -1,5 +1,6 @@
 "use client";
 
+import { FusedLogo } from "@/components/common/FusedLogo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -10,7 +11,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ShieldCheck,
   Target,
   Users,
 } from "lucide-react";
@@ -44,9 +44,21 @@ const navSections: NavSection[] = [
         icon: LayoutDashboard,
       },
       { href: "/partner/stations", label: "Stations réseau", icon: Building2 },
-      { href: "/partner/ventes", label: "Ventes & Volumes", icon: BarChart3 },
-      { href: "/partner/stocks", label: "Stocks carburant", icon: Droplets },
-      { href: "/partner/objectifs", label: "Objectifs", icon: Target },
+      {
+        href: "/partner/rapports/volumes",
+        label: "Ventes & Volumes",
+        icon: BarChart3,
+      },
+      {
+        href: "/partner/rapports/stocks",
+        label: "Stocks carburant",
+        icon: Droplets,
+      },
+      {
+        href: "/partner/rapports/realisations",
+        label: "Objectifs",
+        icon: Target,
+      },
     ],
   },
   {
@@ -54,7 +66,7 @@ const navSections: NavSection[] = [
     items: [
       { href: "/partner/users", label: "Utilisateurs", icon: Users },
       {
-        href: "/partner/doleances",
+        href: "/partner/grievances",
         label: "Doléances",
         icon: AlertCircle,
         badge: 0,
@@ -103,17 +115,7 @@ function SidebarContent({ onNavigate }: SidebarProps) {
         style={{ borderBottom: "0.5px solid var(--border)" }}
       >
         <div className="flex items-center gap-[9px]">
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{
-              width: 32,
-              height: 32,
-              background: GREEN,
-              borderRadius: 8,
-            }}
-          >
-            <ShieldCheck style={{ width: 16, height: 16, color: "white" }} />
-          </div>
+          <FusedLogo size={32} />
           <div className="min-w-0 flex-1">
             <p
               style={{
@@ -316,11 +318,11 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
   const pageTitle = (() => {
     if (pathname.includes("/dashboard")) return "Tableau de bord Réseau";
     if (pathname.includes("/stations")) return "Stations Réseau";
-    if (pathname.includes("/ventes")) return "Ventes & Volumes";
-    if (pathname.includes("/stocks")) return "Stocks Carburant";
-    if (pathname.includes("/objectifs")) return "Objectifs";
+    if (pathname.includes("/rapports/volumes")) return "Ventes & Volumes";
+    if (pathname.includes("/rapports/stocks")) return "Stocks Carburant";
+    if (pathname.includes("/rapports/realisations")) return "Objectifs";
     if (pathname.includes("/users")) return "Utilisateurs";
-    if (pathname.includes("/doleances")) return "Doléances";
+    if (pathname.includes("/grievances")) return "Doléances";
     if (pathname.includes("/rapports")) return "Rapports Réseau";
     return "Espace Partenaire";
   })();

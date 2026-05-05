@@ -1,5 +1,6 @@
 "use client";
 
+import { FusedLogo } from "@/components/common/FusedLogo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
 import {
@@ -110,17 +111,7 @@ function SidebarContent({ onNavigate }: SidebarProps) {
         style={{ borderBottom: "0.5px solid var(--border)" }}
       >
         <div className="flex items-center gap-[9px]">
-          <div
-            className="flex items-center justify-center shrink-0"
-            style={{
-              width: 32,
-              height: 32,
-              background: PURPLE,
-              borderRadius: 8,
-            }}
-          >
-            <ShieldCheck style={{ width: 16, height: 16, color: "white" }} />
-          </div>
+          <FusedLogo size={32} />
           <div className="min-w-0 flex-1">
             <p
               style={{

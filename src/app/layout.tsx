@@ -7,8 +7,8 @@ export const metadata: Metadata = {
   description: "Système ERP pour stations-service",
   manifest: "/manifest.json",
   icons: {
-    icon: "/icon.png",
-    apple: "/icon.png",
+    icon: "/favicon.png",
+    apple: "/favicon.png",
   },
 };
 
