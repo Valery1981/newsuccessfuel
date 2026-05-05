@@ -92,8 +92,21 @@ export function ManagerNonSalesOperationsPage({
 }: ManagerNonSalesOperationsPageProps = {}) {
   const { entreprise } = useAuthStore();
   const queryClient = useQueryClient();
+
+  // Map kebab-case initialDialog to dialog keys
+  const dialogKeyMap: Record<string, string> = {
+    "virement-interne": "virement",
+    "encaissement-creances": "creance",
+    "reglement-dettes": "dette",
+    "charges-courantes": "charge",
+    salaires: "salaire",
+    "charges-fiscales": "charge-fiscale",
+    "operations-gerant": "gerant",
+    immobilisations: "immobilisation",
+  };
+
   const [dialogOpen, setDialogOpen] = useState<string | null>(
-    initialDialog ?? null,
+    initialDialog ? (dialogKeyMap[initialDialog] ?? null) : null,
   );
 
   const { data: tresoreries } = useQuery({

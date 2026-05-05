@@ -207,17 +207,8 @@ export function StructureCarburantsPage() {
       field: "prix_vente" | "marge_litre";
       value: number;
     }) => {
-      const currentRow = (prixList ?? []).find((p) => p.id === id);
-      const prix_vente =
-        field === "prix_vente" ? value : (currentRow?.prix_vente ?? 0);
-      const marge_litre =
-        field === "marge_litre" ? value : (currentRow?.marge_litre ?? 0);
-      const prix_achat = prix_vente - marge_litre;
-
       const updatePayload =
-        field === "prix_vente"
-          ? { prix_vente: value, prix_achat }
-          : { marge_litre: value, prix_achat };
+        field === "prix_vente" ? { prix_vente: value } : { marge_litre: value };
       const { error } = await supabase
         .from("prix_carburant")
         .update(updatePayload)

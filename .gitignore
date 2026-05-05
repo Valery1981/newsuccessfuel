@@ -42,3 +42,6 @@ next-env.d.ts
 
 # style reference files
 STYLES/
+
+# old files
+OLD/

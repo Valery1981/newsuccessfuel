@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { PageLoading } from "@/components/common/LoadingSpinner";
@@ -39,16 +39,105 @@ import { stationService } from "@/services/stationService";
 import { useAuthStore } from "@/stores/authStore";
 import type { Database } from "@/types/supabase";
 
+// ── Types ───────────────────────────────────────────────────────────
+
 type InitialisationRow = Database["public"]["Tables"]["initialisation"]["Row"];
 type StationRow = Database["public"]["Tables"]["stations"]["Row"];
 type CuveRow = Database["public"]["Tables"]["cuves"]["Row"];
 type PistoletRow = Database["public"]["Tables"]["pistolets"]["Row"];
+
+interface TiersAccount {
+  id: string;
+  account_id: string;
+  label: string;
+  type: string;
+}
+
+interface FixedAssetAccount {
+  account_id: string;
+  label: string;
+}
+
+interface AccountsBundle {
+  treasury: TreasuryAccount[];
+  receivable: TiersAccount[];
+  payable: TiersAccount[];
+  fixed_assets: FixedAssetAccount[];
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+const fmt = (n: number) =>
+  n.toLocaleString("fr-MG", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+const parseAmt = (s: string): number => {
+  const n = parseFloat(s.replace(",", "."));
+  return isNaN(n) || n < 0 ? 0 : n;
+};
 
 export function CompanyInitialisationPage() {
   const { entreprise, compte } = useAuthStore();
   const queryClient = useQueryClient();
   const [confirmValidate, setConfirmValidate] = useState(false);
   const [selectedStation, setSelectedStation] = useState("");
+
+  // ── State declarations (must be before computed values) ──────────────
+  const [boutiqueStocks, setBoutiqueStocks] = useState<
+    Record<string, { qty: string; value: number }>
+  >({});
+  const [tresorerieSoldes, setTresorerieSoldes] = useState<
+    Record<string, string>
+  >({});
+  const [creancesSoldes, setCreancesSoldes] = useState<Record<string, string>>(
+    {},
+  );
+  const [dettesSoldes, setDettesSoldes] = useState<Record<string, string>>({});
+  const [immobilisations, setImmobilisations] = useState<
+    Record<string, string>
+  >({});
+  const [cuveJauges, setCuveJauges] = useState<
+    Record<
+      string,
+      { jauge_cm: string; volume_litres: string; prix_achat: string }
+    >
+  >({});
+  const [pistoletIndexes, setPistoletIndexes] = useState<
+    Record<string, string>
+  >({});
+
+  // ── Data queries for new tabs ────────────────────────────────────────
+  const { data: boutiqueItems } = useQuery({
+    queryKey: ["boutique-init", selectedStation, entreprise?.id],
+    queryFn: () =>
+      selectedStation && entreprise
+        ? initialisationService.getBoutiqueInitItems(
+            selectedStation,
+            entreprise.id,
+          )<BoutiqueInitItem[]>
+        : [],
+    enabled: !!selectedStation && !!entreprise?.id,
+  });
+
+  const { data: accountsBundle } = useQuery<AccountsBundle | null>({
+    queryKey: ["accounts-bundle", entreprise?.id],
+    queryFn: () =>
+      entreprise
+        ? initialisationService.getInitialisationAccountsBundle(entreprise.id)
+        : null,
+    enabled: !!entreprise?.id,
+  });
+
+  const { data: openingBalanceSummary } = useQuery({
+    queryKey: ["opening-balance-summary", entreprise?.id],
+    queryFn: () =>
+      entreprise
+        ? initialisationService.getOpeningBalanceSummary(entreprise.id)
+        : null,
+    enabled: !!entreprise?.id,
+  });
 
   const { data: initialisation, isLoading } =
     useQuery<InitialisationRow | null>({
@@ -79,16 +168,71 @@ export function CompanyInitialisationPage() {
     enabled: !!selectedStation,
   });
 
-  // State for cuve jauges
-  const [cuveJauges, setCuveJauges] = useState<
-    Record<
-      string,
-      { jauge_cm: string; volume_litres: string; prix_achat: string }
-    >
-  >({});
-  const [pistoletIndexes, setPistoletIndexes] = useState<
-    Record<string, string>
-  >({});
+  // ── Computed totals ───────────────────────────────────────────────────
+  const computedTotals = useMemo(() => {
+    const cuveTotal = (cuves ?? []).reduce((sum, c) => {
+      const data = cuveJauges[c.id];
+      if (!data) return sum;
+      return (
+        sum + (Number(data.volume_litres) || 0) * (Number(data.prix_achat) || 0)
+      );
+    }, 0);
+
+    const boutiqueTotal = (boutiqueItems ?? []).reduce((sum, b) => {
+      const data = boutiqueStocks[b.product_id];
+      if (!data) return sum;
+      return sum + data.value;
+    }, 0);
+
+    const tresorerieTotal = Object.values(tresorerieSoldes).reduce(
+      (sum, v) => sum + parseAmt(v),
+      0,
+    );
+    const creancesTotal = Object.values(creancesSoldes).reduce(
+      (sum, v) => sum + parseAmt(v),
+      0,
+    );
+    const dettesTotal = Object.values(dettesSoldes).reduce(
+      (sum, v) => sum + parseAmt(v),
+      0,
+    );
+    const immobilisationsTotal = Object.values(immobilisations).reduce(
+      (sum, v) => sum + parseAmt(v),
+      0,
+    );
+
+    const totalActif =
+      cuveTotal +
+      boutiqueTotal +
+      tresorerieTotal +
+      creancesTotal +
+      immobilisationsTotal;
+    const totalPassif = dettesTotal;
+    const capitalNet = totalActif - totalPassif;
+
+    return {
+      fuel: cuveTotal,
+      boutique: boutiqueTotal,
+      treasury: tresorerieTotal,
+      receivable: creancesTotal,
+      payable: dettesTotal,
+      asset: immobilisationsTotal,
+      totalActif,
+      totalPassif,
+      capitalNet,
+    };
+  }, [
+    cuves,
+    cuveJauges,
+    boutiqueItems,
+    boutiqueStocks,
+    tresorerieSoldes,
+    creancesSoldes,
+    dettesSoldes,
+    immobilisations,
+  ]);
+
+  const summary = openingBalanceSummary || computedTotals;
 
   const validationMutation = useMutation({
     mutationFn: () => {
@@ -128,7 +272,123 @@ export function CompanyInitialisationPage() {
         entries,
       );
     },
-    onSuccess: () => toast.success("Cuves enregistrées"),
+    onSuccess: () => {
+      toast.success("Cuves enregistrées");
+      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const saveBoutiqueMutation = useMutation({
+    mutationFn: async () => {
+      if (!initialisation) throw new Error("Session invalide");
+      const entries = (boutiqueItems ?? [])
+        .filter((b) => boutiqueStocks[b.product_id])
+        .map((b) => ({
+          article_id: b.product_id,
+          station_id: selectedStation,
+          quantite_initiale: Number(boutiqueStocks[b.product_id].qty),
+          prix_achat_initial: b.purchase_price,
+        }));
+      await initialisationService.saveInitialisationStocksBoutique(
+        initialisation.id,
+        entries,
+      );
+    },
+    onSuccess: () => {
+      toast.success("Stock boutique enregistré");
+      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
+  const saveComptesMutation = useMutation({
+    mutationFn: async (
+      onglet: "tresorerie" | "creances" | "dettes" | "immobilisations",
+    ) => {
+      if (!initialisation) throw new Error("Session invalide");
+      const entries: {
+        numero_compte: string;
+        libelle_compte: string;
+        solde_debit: number;
+        solde_credit: number;
+        onglet: "tresorerie" | "tiers" | "immobilisations";
+        tresorerie_id?: string;
+        tiers_id?: string;
+      }[] = [];
+
+      if (onglet === "tresorerie" && accountsBundle?.treasury) {
+        accountsBundle.treasury.forEach((t) => {
+          const solde = tresorerieSoldes[t.id];
+          if (solde) {
+            entries.push({
+              numero_compte: t.numero_compte,
+              libelle_compte: t.libelle,
+              solde_debit: Number(solde),
+              solde_credit: 0,
+              onglet: "tresorerie",
+              tresorerie_id: t.id,
+            });
+          }
+        });
+      }
+
+      if (onglet === "creances" && accountsBundle?.receivable) {
+        accountsBundle.receivable.forEach((r) => {
+          const solde = creancesSoldes[r.id];
+          if (solde) {
+            entries.push({
+              numero_compte: r.account_id,
+              libelle_compte: r.label,
+              solde_debit: Number(solde),
+              solde_credit: 0,
+              onglet: "tiers",
+              tiers_id: r.id,
+            });
+          }
+        });
+      }
+
+      if (onglet === "dettes" && accountsBundle?.payable) {
+        accountsBundle.payable.forEach((p) => {
+          const solde = dettesSoldes[p.id];
+          if (solde) {
+            entries.push({
+              numero_compte: p.account_id,
+              libelle_compte: p.label,
+              solde_debit: 0,
+              solde_credit: Number(solde),
+              onglet: "tiers",
+              tiers_id: p.id,
+            });
+          }
+        });
+      }
+
+      if (onglet === "immobilisations" && accountsBundle?.fixed_assets) {
+        accountsBundle.fixed_assets.forEach((a) => {
+          const valeur = immobilisations[a.account_id];
+          if (valeur) {
+            entries.push({
+              numero_compte: a.account_id,
+              libelle_compte: a.label,
+              solde_debit: Number(valeur),
+              solde_credit: 0,
+              onglet: "immobilisations",
+            });
+          }
+        });
+      }
+
+      await initialisationService.saveInitialisationComptes(
+        initialisation.id,
+        entries,
+      );
+    },
+    onSuccess: () => {
+      toast.success("Comptes enregistrés");
+      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    },
     onError: (error) => toast.error(error.message),
   });
 
@@ -161,7 +421,7 @@ export function CompanyInitialisationPage() {
           <CheckCircle className="h-4 w-4 text-green-500" />
           <AlertTitle>Initialisation validée</AlertTitle>
           <AlertDescription>
-            L'initialisation a été validée le{" "}
+            L&apos;initialisation a été validée le{" "}
             {initialisation.validee_at
               ? new Date(initialisation.validee_at).toLocaleDateString("fr-FR")
               : ""}
@@ -186,18 +446,18 @@ export function CompanyInitialisationPage() {
             className="bg-green-600 hover:bg-green-700"
           >
             <CheckCircle className="w-4 h-4 mr-2" />
-            Valider l'initialisation
+            Valider l&apos;initialisation
           </Button>
         }
       />
 
-      <Alert className="border-amber-500 bg-amber-50">
+      <Alert className="border-amber-500 bg-amber-200">
         <AlertTriangle className="h-4 w-4 text-amber-500" />
         <AlertTitle>Action irréversible</AlertTitle>
         <AlertDescription>
-          La validation de l'initialisation est irréversible. Elle génère les A
-          Nouveau comptables, les entrées de stock initiales et le Capital Net.
-          Vérifiez bien toutes les données avant de valider.
+          La validation de l&apos;initialisation est irréversible. Elle génère
+          les A Nouveau comptables, les entrées de stock initiales et le Capital
+          Net. Vérifiez bien toutes les données avant de valider.
         </AlertDescription>
       </Alert>
 
@@ -233,7 +493,8 @@ export function CompanyInitialisationPage() {
           <TabsTrigger value="pistolets">Index Pistolets</TabsTrigger>
           <TabsTrigger value="stock-boutique">Stock Boutique</TabsTrigger>
           <TabsTrigger value="tresorerie">Trésorerie</TabsTrigger>
-          <TabsTrigger value="tiers">Tiers</TabsTrigger>
+          <TabsTrigger value="tiers">Créances</TabsTrigger>
+          <TabsTrigger value="dettes">Dettes</TabsTrigger>
           <TabsTrigger value="immobilisations">Immobilisations</TabsTrigger>
         </TabsList>
 
@@ -387,63 +648,383 @@ export function CompanyInitialisationPage() {
           </Card>
         </TabsContent>
 
-        {/* Other tabs - simplified placeholders */}
+        {/* Tab Stock Boutique */}
         <TabsContent value="stock-boutique">
           <Card>
             <CardHeader>
               <CardTitle>Stock Boutique Initial</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                Fonctionnalité en développement — saisissez les quantités et
-                prix d'achat initiaux de vos articles en boutique.
-              </p>
+            <CardContent className="space-y-4">
+              {!selectedStation ? (
+                <p className="text-muted-foreground text-sm">
+                  Sélectionnez une station pour voir ses articles boutique
+                </p>
+              ) : (
+                <>
+                  {(boutiqueItems ?? []).map((item) => (
+                    <div
+                      key={item.product_id}
+                      className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 border rounded-lg"
+                    >
+                      <div className="sm:col-span-2">
+                        <p className="font-medium">{item.product_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.family_name}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Prix achat (MGA)</Label>
+                        <Input
+                          type="number"
+                          value={item.purchase_price}
+                          disabled
+                          className="bg-muted"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Quantité initiale</Label>
+                        <Input
+                          type="number"
+                          value={boutiqueStocks[item.product_id]?.qty || ""}
+                          onChange={(e) => {
+                            const qty = e.target.value;
+                            const value = parseAmt(qty) * item.purchase_price;
+                            setBoutiqueStocks((prev) => ({
+                              ...prev,
+                              [item.product_id]: { qty, value },
+                            }));
+                          }}
+                          placeholder="0"
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => saveBoutiqueMutation.mutate()}
+                    disabled={saveBoutiqueMutation.isPending}
+                  >
+                    {saveBoutiqueMutation.isPending && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Enregistrer le stock boutique
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Tab Trésorerie */}
         <TabsContent value="tresorerie">
           <Card>
             <CardHeader>
               <CardTitle>Soldes Trésorerie Initiaux</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                Saisissez les soldes initiaux de vos comptes de trésorerie
-                (banque, mobile money, caisse).
-              </p>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Ces données s&apos;appliquent à l&apos;ensemble de
+                  l&apos;entreprise (toutes les stations).
+                </p>
+              </div>
+              {(accountsBundle?.treasury ?? []).map((t) => (
+                <div
+                  key={t.id}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                >
+                  <div className="sm:col-span-2">
+                    <p className="font-medium">{t.libelle}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Compte: {t.numero_compte}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Solde initial (MGA)</Label>
+                    <Input
+                      type="number"
+                      value={tresorerieSoldes[t.id] || ""}
+                      onChange={(e) =>
+                        setTresorerieSoldes((prev) => ({
+                          ...prev,
+                          [t.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                      min={0}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                onClick={() => saveComptesMutation.mutate("tresorerie")}
+                disabled={saveComptesMutation.isPending}
+              >
+                {saveComptesMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Enregistrer les trésoreries
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Tab Créances */}
         <TabsContent value="tiers">
           <Card>
             <CardHeader>
-              <CardTitle>Soldes Tiers Initiaux</CardTitle>
+              <CardTitle>Créances Initiales</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                Saisissez les soldes initiaux de vos fournisseurs et clients
-                (créances et dettes existantes).
-              </p>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Ces données s&apos;appliquent à l&apos;ensemble de
+                  l&apos;entreprise (toutes les stations).
+                </p>
+              </div>
+              {(accountsBundle?.receivable ?? []).map((r) => (
+                <div
+                  key={r.id}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                >
+                  <div className="sm:col-span-2">
+                    <p className="font-medium">{r.label}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Compte: {r.account_id} · Type: {r.type}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">
+                      Solde initial (débit, MGA)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={creancesSoldes[r.id] || ""}
+                      onChange={(e) =>
+                        setCreancesSoldes((prev) => ({
+                          ...prev,
+                          [r.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                      min={0}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                onClick={() => saveComptesMutation.mutate("creances")}
+                disabled={saveComptesMutation.isPending}
+              >
+                {saveComptesMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Enregistrer les créances
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Tab Dettes */}
+        <TabsContent value="dettes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Dettes Initiales</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Ces données s&apos;appliquent à l&apos;ensemble de
+                  l&apos;entreprise (toutes les stations).
+                </p>
+              </div>
+              {(accountsBundle?.payable ?? []).map((p) => (
+                <div
+                  key={p.id}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                >
+                  <div className="sm:col-span-2">
+                    <p className="font-medium">{p.label}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Compte: {p.account_id} · Type: {p.type}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">
+                      Solde initial (crédit, MGA)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={dettesSoldes[p.id] || ""}
+                      onChange={(e) =>
+                        setDettesSoldes((prev) => ({
+                          ...prev,
+                          [p.id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                      min={0}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                onClick={() => saveComptesMutation.mutate("dettes")}
+                disabled={saveComptesMutation.isPending}
+              >
+                {saveComptesMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Enregistrer les dettes
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab Immobilisations */}
         <TabsContent value="immobilisations">
           <Card>
             <CardHeader>
               <CardTitle>Immobilisations Initiales</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                Enregistrez vos immobilisations corporelles et incorporelles
-                initiales (véhicules, équipements, etc.).
-              </p>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Ces données s&apos;appliquent à l&apos;ensemble de
+                  l&apos;entreprise (toutes les stations).
+                </p>
+              </div>
+              {(accountsBundle?.fixed_assets ?? []).map((a) => (
+                <div
+                  key={a.account_id}
+                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                >
+                  <div className="sm:col-span-2">
+                    <p className="font-medium">{a.label}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Compte: {a.account_id}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Valeur initiale (MGA)</Label>
+                    <Input
+                      type="number"
+                      value={immobilisations[a.account_id] || ""}
+                      onChange={(e) =>
+                        setImmobilisations((prev) => ({
+                          ...prev,
+                          [a.account_id]: e.target.value,
+                        }))
+                      }
+                      placeholder="0"
+                      min={0}
+                    />
+                  </div>
+                </div>
+              ))}
+              <Button
+                onClick={() => saveComptesMutation.mutate("immobilisations")}
+                disabled={saveComptesMutation.isPending}
+              >
+                {saveComptesMutation.isPending && (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                )}
+                Enregistrer les immobilisations
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Balance Sheet Summary - Synthèse du bilan d'ouverture */}
+      <Card className="bg-slate-50 border-2 border-slate-200">
+        <CardHeader>
+          <CardTitle className="text-lg font-bold text-slate-800">
+            Synthèse du bilan d&apos;ouverture
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Actif */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+              Actif
+            </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Stock carburant (toutes stations)</span>
+                <span className="font-mono">{fmt(summary.fuel)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Stock boutique (toutes stations)</span>
+                <span className="font-mono">{fmt(summary.boutique)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Trésoreries (entreprise)</span>
+                <span className="font-mono">{fmt(summary.treasury)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Créances (entreprise)</span>
+                <span className="font-mono">{fmt(summary.receivable)}</span>
+              </div>
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Immobilisations (entreprise)</span>
+                <span className="font-mono">{fmt(summary.asset)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
+                <span>= Total Actif</span>
+                <span className="font-mono">{fmt(summary.totalActif)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Passif */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+              Passif
+            </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm text-slate-600 pl-4">
+                <span>Dettes (entreprise)</span>
+                <span className="font-mono">{fmt(summary.payable)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
+                <span>= Total Passif</span>
+                <span className="font-mono">{fmt(summary.totalPassif)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Capital Net Initial */}
+          <div
+            className={`flex justify-between items-center p-4 rounded-lg border-2 ${
+              summary.capitalNet >= 0
+                ? "bg-green-50 border-green-300"
+                : "bg-red-50 border-red-300"
+            }`}
+          >
+            <div>
+              <p
+                className={`font-bold text-sm ${
+                  summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
+                }`}
+              >
+                Capital Net Initial
+              </p>
+              <p className="text-xs text-slate-600 mt-1">
+                Total Actif − Total Passif · lecture seule · agrégat entreprise
+                (données enregistrées)
+              </p>
+            </div>
+            <span
+              className={`font-mono font-extrabold text-xl ${
+                summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
+              }`}
+            >
+              {fmt(summary.capitalNet)}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* APEX-16-final : Dialog validation avec aperçu A Nouveau (§5.5-23) */}
       <Dialog open={confirmValidate} onOpenChange={setConfirmValidate}>

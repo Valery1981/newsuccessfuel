@@ -113,7 +113,7 @@ export function AdminDashboardPage() {
   return (
     <PageContainer>
       <PageHeader
-        title="Tableau de bord Admin"
+        title="Dashboard Admin"
         description="Vue d'ensemble du système SuccessFuel"
         actions={
           <div className="flex gap-2">

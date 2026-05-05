@@ -1,5 +1,4 @@
 import { createClient } from "@/utils/supabase/client";
-import type { Database } from "@/types/supabase";
 
 const supabase = createClient();
 
@@ -32,7 +31,7 @@ export const initialisationService = {
       jauge_initiale_cm: number;
       volume_initial_litres: number;
       prix_achat_initial: number;
-    }>
+    }>,
   ) {
     // Delete existing for this initialisation
     await supabase
@@ -42,9 +41,11 @@ export const initialisationService = {
 
     if (entries.length === 0) return;
 
-    const { error } = await supabase.from("initialisation_cuves").insert(
-      entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
-    );
+    const { error } = await supabase
+      .from("initialisation_cuves")
+      .insert(
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId })),
+      );
     if (error) throw error;
   },
 
@@ -54,7 +55,7 @@ export const initialisationService = {
       pistolet_id: string;
       station_id: string;
       index_initial: number;
-    }>
+    }>,
   ) {
     await supabase
       .from("initialisation_index_pistolets")
@@ -66,7 +67,7 @@ export const initialisationService = {
     const { error } = await supabase
       .from("initialisation_index_pistolets")
       .insert(
-        entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId })),
       );
     if (error) throw error;
   },
@@ -78,7 +79,7 @@ export const initialisationService = {
       station_id: string;
       quantite_initiale: number;
       prix_achat_initial: number;
-    }>
+    }>,
   ) {
     await supabase
       .from("initialisation_stocks_boutique")
@@ -90,7 +91,7 @@ export const initialisationService = {
     const { error } = await supabase
       .from("initialisation_stocks_boutique")
       .insert(
-        entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId })),
       );
     if (error) throw error;
   },
@@ -105,7 +106,7 @@ export const initialisationService = {
       tiers_id?: string;
       tresorerie_id?: string;
       onglet: "immobilisations" | "tiers" | "tresorerie" | "autres_dettes";
-    }>
+    }>,
   ) {
     await supabase
       .from("initialisation_comptes")
@@ -114,9 +115,11 @@ export const initialisationService = {
 
     if (entries.length === 0) return;
 
-    const { error } = await supabase.from("initialisation_comptes").insert(
-      entries.map((e) => ({ ...e, initialisation_id: initialisationId }))
-    );
+    const { error } = await supabase
+      .from("initialisation_comptes")
+      .insert(
+        entries.map((e) => ({ ...e, initialisation_id: initialisationId })),
+      );
     if (error) throw error;
   },
 
@@ -168,5 +171,82 @@ export const initialisationService = {
       stocks: stocks.data ?? [],
       comptes: comptes.data ?? [],
     };
+  },
+
+  async getOpeningBalanceSummary(entrepriseId: string) {
+    const { data, error } = await supabase.rpc(
+      "compute_opening_balance_summary",
+      {
+        p_entreprise_id: entrepriseId,
+      },
+    );
+    if (error) throw error;
+    return data;
+  },
+
+  async getInitialisationAccountsBundle(entrepriseId: string) {
+    const [treasury, receivable, payable, fixedAssets] = await Promise.all([
+      supabase
+        .from("tresoreries")
+        .select("id, numero_compte, libelle, solde_actuel")
+        .eq("entreprise_id", entrepriseId)
+        .eq("is_active", true),
+      supabase
+        .from("tiers")
+        .select("id, compte_principal as account_id, nom as label, type")
+        .eq("entreprise_id", entrepriseId)
+        .eq("is_active", true)
+        .in("type", ["client", "employe"]),
+      supabase
+        .from("tiers")
+        .select("id, compte_principal as account_id, nom as label, type")
+        .eq("entreprise_id", entrepriseId)
+        .eq("is_active", true)
+        .in("type", ["fournisseur"]),
+      supabase
+        .from("plan_comptable_standard")
+        .select("numero as account_id, libelle as label")
+        .gte("numero", "200")
+        .lt("numero", "300"),
+    ]);
+
+    return {
+      treasury: treasury.data ?? [],
+      receivable: receivable.data ?? [],
+      payable: payable.data ?? [],
+      fixed_assets: fixedAssets.data ?? [],
+    };
+  },
+
+  async getBoutiqueInitItems(stationId: string, entrepriseId: string) {
+    const { data, error } = await supabase
+      .from("articles")
+      .select("id, nom, famille, prix_achat")
+      .eq("entreprise_id", entrepriseId)
+      .eq("is_active", true)
+      .neq("famille", "Carburants");
+    if (error) throw error;
+    return (data ?? []).map((a: any) => ({
+      product_id: a.id,
+      product_name: a.nom,
+      family_name: a.famille,
+      purchase_price: a.prix_achat || 0,
+    }));
+  },
+
+  async getFuelInitItems(stationId: string) {
+    const { data, error } = await supabase
+      .from("cuves")
+      .select("id, nom, type_carburant, capacite_max, prix_achat")
+      .eq("station_id", stationId)
+      .eq("is_active", true);
+    if (error) throw error;
+    return (data ?? []).map((c: any) => ({
+      tank_id: c.id,
+      tank_name: c.nom,
+      product_name: c.type_carburant,
+      gauge_unit: "cm",
+      purchase_price: c.prix_achat || 0,
+    }));
   },
 };

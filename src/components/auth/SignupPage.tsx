@@ -1,17 +1,15 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -19,6 +17,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { authService } from "@/services/authService";
 
 const signupSchema = z
@@ -31,7 +31,7 @@ const signupSchema = z
       .min(8, "Mot de passe minimum 8 caractères")
       .regex(
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        "Doit contenir majuscule, minuscule et chiffre"
+        "Doit contenir majuscule, minuscule et chiffre",
       ),
     confirmPassword: z.string().min(1, "Confirmation obligatoire"),
   })
@@ -52,6 +52,7 @@ export function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
+    mode: "onBlur",
   });
 
   const onSubmit = async (data: SignupFormData) => {
@@ -68,9 +69,7 @@ export function SignupPage() {
       const msg =
         error instanceof Error ? error.message : "Erreur lors de l'inscription";
       toast.error(
-        msg.includes("already registered")
-          ? "Cet email est déjà utilisé"
-          : msg
+        msg.includes("already registered") ? "Cet email est déjà utilisé" : msg,
       );
     }
   };

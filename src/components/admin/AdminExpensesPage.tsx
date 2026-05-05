@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Download, Plus, Receipt } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { EmptyState } from "@/components/common/EmptyState";
+import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { PageLoading } from "@/components/common/LoadingSpinner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -27,7 +27,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -36,8 +35,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { adminService } from "@/services/adminService";
+import { Textarea } from "@/components/ui/textarea";
 import { exportCsv } from "@/lib/exportCsv";
+import { adminService } from "@/services/adminService";
 import { useAuthStore } from "@/stores/authStore";
 
 const CATEGORIES = [
@@ -102,7 +102,7 @@ export function AdminExpensesPage() {
         "Montant (MGA)": d.montant,
         Devise: d.devise,
       })),
-      "depenses-plateforme"
+      "depenses-plateforme",
     );
   };
 
@@ -137,7 +137,9 @@ export function AdminExpensesPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-5">
-            <p className="text-xs text-muted-foreground">Total dépenses (MGA)</p>
+            <p className="text-xs text-muted-foreground">
+              Total dépenses (MGA)
+            </p>
             <p className="text-3xl font-bold mt-1 text-red-600">
               {totalGeneral.toLocaleString("fr-FR")}
             </p>
@@ -145,7 +147,9 @@ export function AdminExpensesPage() {
         </Card>
         <Card>
           <CardContent className="pt-5">
-            <p className="text-xs text-muted-foreground">Nombre d&apos;entrées</p>
+            <p className="text-xs text-muted-foreground">
+              Nombre d&apos;entrées
+            </p>
             <p className="text-3xl font-bold mt-1">{(depenses ?? []).length}</p>
           </CardContent>
         </Card>
@@ -167,7 +171,7 @@ export function AdminExpensesPage() {
           {(depenses ?? []).length === 0 ? (
             <EmptyState
               icon={Receipt}
-              title="Aucune dépense enregistrée"
+              title="Historique vide"
               description="Ajoutez la première dépense plateforme."
             />
           ) : (
