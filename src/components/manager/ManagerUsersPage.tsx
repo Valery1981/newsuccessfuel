@@ -49,7 +49,7 @@ import {
 } from "lucide-react";
 import { nanoid } from "nanoid";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -114,6 +114,11 @@ export function ManagerUsersPage() {
     resolver: zodResolver(createSchema),
   });
 
+  const motDePasseTemp = useWatch({
+    control: createForm.control,
+    name: "motDePasseTemp",
+  });
+
   const createMutation = useMutation({
     mutationFn: async (data: CreateForm) => {
       const res = await fetch("/api/auth/create-session", {
@@ -170,6 +175,11 @@ export function ManagerUsersPage() {
   });
 
   const resetForm = useForm<ResetForm>({ resolver: zodResolver(resetSchema) });
+
+  const resetMotDePasseTemp = useWatch({
+    control: resetForm.control,
+    name: "motDePasseTemp",
+  });
 
   const resetMutation = useMutation({
     mutationFn: async (data: ResetForm) => {
@@ -389,9 +399,7 @@ export function ManagerUsersPage() {
               </Label>
               <div className="flex gap-2">
                 <Input
-                  value={
-                    generatedPw || createForm.watch("motDePasseTemp") || ""
-                  }
+                  value={generatedPw || motDePasseTemp || ""}
                   onChange={(e) => {
                     setGeneratedPw("");
                     createForm.setValue("motDePasseTemp", e.target.value);
@@ -471,9 +479,7 @@ export function ManagerUsersPage() {
               </Label>
               <div className="flex gap-2">
                 <Input
-                  value={
-                    generatedResetPw || resetForm.watch("motDePasseTemp") || ""
-                  }
+                  value={generatedResetPw || resetMotDePasseTemp || ""}
                   onChange={(e) => {
                     setGeneratedResetPw("");
                     resetForm.setValue("motDePasseTemp", e.target.value);

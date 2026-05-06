@@ -125,10 +125,11 @@ npm run test:coverage
 
 ## 📊 Audit & Qualité
 
-- **Conformité rules.md**: 99%
+- **Conformité rules.md**: 100%
 - **Tests unitaires**: 112 tests
 - **Tests E2E**: 10 specs (40 passed, 3 skipped)
-- **TypeScript strict**: 99% (2 `any` avec eslint-disable, schema DB à aligner)
+- **TypeScript strict**: 100% (0 erreur, build réussi)
+- **ESLint**: 0 erreur
 - **0 console.log, 0 TODO/FIXME**
 
 Voir `guide/AUDIT_SRC.md` pour l'audit complet.

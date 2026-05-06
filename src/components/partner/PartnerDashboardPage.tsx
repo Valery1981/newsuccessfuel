@@ -85,7 +85,7 @@ interface KpiCardProps {
 
 function KpiCard({ title, value, icon, sub, danger }: KpiCardProps) {
   return (
-    <Card className={danger ? "border-red-200 bg-red-50/30" : ""}>
+    <Card className={danger ? "border-red-500/50 bg-red-500/10" : ""}>
       <CardContent className="pt-5 pb-4">
         <div className="flex items-start justify-between">
           <div>
@@ -93,7 +93,7 @@ function KpiCard({ title, value, icon, sub, danger }: KpiCardProps) {
               {title}
             </p>
             <p
-              className={`text-xl font-bold ${danger ? "text-red-700" : "text-foreground"}`}
+              className={`text-xl font-bold ${danger ? "text-red-400" : "text-foreground"}`}
             >
               {value}
             </p>

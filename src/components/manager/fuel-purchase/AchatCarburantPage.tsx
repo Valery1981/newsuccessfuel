@@ -44,30 +44,12 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { z } from "zod";
 
 const supabase = createClient();
 
 // ============================
 // ÉTAPE 1 : BON DE COMMANDE
 // ============================
-const bcSchema = z.object({
-  fournisseur_id: z.string().min(1, "Fournisseur requis"),
-  date_commande: z.string().min(1, "Date requise"),
-  lignes: z
-    .array(
-      z.object({
-        station_id: z.string().min(1, "Station requise"),
-        produit: z.enum(["essence", "gasoil", "petrole"]),
-        quantite_commandee: z.number().min(1, "Quantité requise"),
-        prix_unitaire: z.number().min(0),
-      }),
-    )
-    .min(1, "Au moins une ligne"),
-});
-
-type BcFormData = z.infer<typeof bcSchema>;
-
 interface AchatCarburant {
   id: string;
   numero_bc: string;
@@ -97,7 +79,6 @@ export function AchatCarburantPage() {
   const [activeMainTab, setActiveMainTab] = useState("liste");
   const [nouvelAchatStep, setNouvelAchatStep] = useState<1 | 2 | 3 | 4>(1);
   const [currentAchatId, setCurrentAchatId] = useState<string | null>(null);
-  const [detailAchat, setDetailAchat] = useState<AchatCarburant | null>(null);
   // APEX-16-suite : aperçu écriture avant comptabilisation
   const [previewComptaAchat, setPreviewComptaAchat] =
     useState<AchatCarburant | null>(null);

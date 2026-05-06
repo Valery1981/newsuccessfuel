@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -89,16 +89,22 @@ export function ManagerStockTransferPage() {
   const {
     register,
     handleSubmit,
+    control,
     setValue,
-    watch,
     reset,
     formState: { errors, isSubmitting },
   } = useForm<TransferFormData>({
     resolver: zodResolver(transferSchema),
   });
 
-  const stationOrigineId = watch("station_origine_id");
-  const articleId = watch("article_id");
+  const stationOrigineId = useWatch({
+    control,
+    name: "station_origine_id",
+  });
+  const articleId = useWatch({
+    control,
+    name: "article_id",
+  });
 
   // Get stock info for selected article and origin station
   const { data: stockInfo } = useQuery({

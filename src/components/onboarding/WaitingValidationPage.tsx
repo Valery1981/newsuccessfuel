@@ -14,17 +14,17 @@ import { useAuthStore } from "@/stores/authStore";
 const STATUS_MAP = {
   en_attente: {
     label: "En attente",
-    color: "bg-yellow-100 text-yellow-800",
+    color: "bg-amber-500/20 text-amber-400 border-amber-500/30",
     icon: Clock,
   },
   validee: {
     label: "Validée",
-    color: "bg-green-100 text-green-800",
+    color: "bg-green-500/20 text-green-400 border-green-500/30",
     icon: CheckCircle,
   },
   suspendue: {
     label: "Suspendue",
-    color: "bg-red-100 text-red-800",
+    color: "bg-red-500/20 text-red-400 border-red-500/30",
     icon: XCircle,
   },
 };

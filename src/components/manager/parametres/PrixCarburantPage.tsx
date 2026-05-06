@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -92,7 +92,7 @@ export function PrixCarburantPage() {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors, isSubmitting },
@@ -106,8 +106,8 @@ export function PrixCarburantPage() {
     },
   });
 
-  const prixVente = watch("prix_vente");
-  const marge = watch("marge_litre");
+  const prixVente = useWatch({ control, name: "prix_vente" });
+  const marge = useWatch({ control, name: "marge_litre" });
   const prixAchatCalc = Number(prixVente) - Number(marge);
 
   const mutation = useMutation({

@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Power, PowerOff, Truck } from "lucide-react";
 import { useState } from "react";
-import { useFieldArray, useForm } from "react-hook-form";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -110,7 +110,10 @@ function CamionForm({
     name: "compartiments",
   });
 
-  const nbCompartiments = form.watch("nombre_compartiments");
+  const nbCompartiments = useWatch({
+    control: form.control,
+    name: "nombre_compartiments",
+  });
 
   function handleNbCompartimentsChange(val: number) {
     const clamped = Math.max(1, Math.min(20, val));

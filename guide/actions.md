@@ -5,6 +5,40 @@
 
 ---
 
+## 2026-05-06
+
+### ACTION #008 — Refactoring & Documentation
+
+**Statut** : ✅ TERMINÉ
+
+**Contexte** : Session de refactoring pour améliorer la qualité du code et documenter le projet.
+
+**Corrections effectuées** :
+
+1. **ESLint** : Correction de 22 erreurs (variables non utilisées, imports inutiles)
+2. **Responsive Design** : Vérification et ajustement des classes Tailwind pour mobile/tablet/desktop
+3. **Couleurs** :
+   - Override Tailwind `amber-500` → SuccessFuel orange `#F5820A` dans `globals.css`
+   - Correction des couleurs light-mode dans `PartnerDashboardPage` et `WaitingValidationPage`
+4. **Tests** : Exécution complète (unitaires + E2E) - tous les tests passent
+5. **Documentation** :
+   - Mise à jour `README.md` (conformité 100%)
+   - Revue complète des fichiers `guide/*.md`
+
+**Fichiers modifiés** :
+
+- `src/app/globals.css` (override amber palette)
+- `src/components/partner/PartnerDashboardPage.tsx` (light-mode colors)
+- `src/components/onboarding/WaitingValidationPage.tsx` (status colors)
+- `src/components/manager/fuel-purchase/AchatCarburantPage.tsx` (remove unused vars)
+- `src/components/manager/initialisation/CompanyInitialisationPage.tsx` (remove unused interface)
+- `src/components/manager/NotificationsPage.tsx` (remove unused import)
+- `src/components/manager/parametres/StructureTiersPage.tsx` (remove unused vars)
+- `src/components/admin/AdminSettingsPage.tsx` (remove unused import)
+- `README.md` (update audit stats)
+
+---
+
 ## 2026-05-05
 
 ### ACTION — Derniers APEX (Phase 7)

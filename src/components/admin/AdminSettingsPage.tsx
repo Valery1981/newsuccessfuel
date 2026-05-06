@@ -1,16 +1,21 @@
 ﻿"use client";
 
+import {
+  AlertTriangle,
+  Check,
+  CreditCard,
+  Pencil,
+  Settings,
+  Sliders,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Check, X, Settings, CreditCard, AlertTriangle, Sliders } from "lucide-react";
 
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -18,6 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 
 interface EditableFieldProps {
   label: string;
@@ -103,13 +110,15 @@ const PLANS = [
     id: "standard",
     label: "Standard",
     prix: "150 000 Ar/mois",
-    description: "Accès complet à la gestion de station (caisse, stock, comptabilité)",
+    description:
+      "Accès complet à la gestion de station (caisse, stock, comptabilité)",
   },
   {
     id: "premium",
     label: "Premium",
     prix: "250 000 Ar/mois",
-    description: "Standard + rapports avancés, multi-station, support prioritaire",
+    description:
+      "Standard + rapports avancés, multi-station, support prioritaire",
   },
 ];
 
@@ -150,7 +159,9 @@ export function AdminSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <Settings className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base">Informations SuccessFuel</CardTitle>
+              <CardTitle className="text-base">
+                Informations SuccessFuel
+              </CardTitle>
             </div>
             <CardDescription>
               Informations générales de la plateforme
@@ -229,7 +240,9 @@ export function AdminSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base">Plans d&apos;abonnement</CardTitle>
+              <CardTitle className="text-base">
+                Plans d&apos;abonnement
+              </CardTitle>
             </div>
             <CardDescription>
               Plans disponibles pour les entreprises
@@ -276,7 +289,9 @@ export function AdminSettingsPage() {
           <CardHeader>
             <div className="flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-primary" />
-              <CardTitle className="text-base">Types d&apos;incidents</CardTitle>
+              <CardTitle className="text-base">
+                Types d&apos;incidents
+              </CardTitle>
             </div>
             <CardDescription>
               Catégories d&apos;incidents configurées pour les doléances
@@ -301,8 +316,8 @@ export function AdminSettingsPage() {
             </div>
             <Separator className="mt-4 mb-2" />
             <p className="text-xs text-muted-foreground">
-              Les types d&apos;incidents sont définis au niveau de la base de données.
-              Contactez l&apos;équipe technique pour les modifier.
+              Les types d&apos;incidents sont définis au niveau de la base de
+              données. Contactez l&apos;équipe technique pour les modifier.
             </p>
           </CardContent>
         </Card>

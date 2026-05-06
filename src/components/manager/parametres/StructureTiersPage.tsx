@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Building2, Plus, Trash2, UserCheck, Users } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -314,15 +314,20 @@ function FournisseurDialog({
   const {
     register,
     handleSubmit,
+    control,
     reset,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FournisseurFormData>({
     resolver: zodResolver(
       fournisseurSchema,
     ) as import("react-hook-form").Resolver<FournisseurFormData>,
     defaultValues: { is_partenaire_carburant: false },
+  });
+
+  const isPartenaireCarburant = useWatch({
+    control,
+    name: "is_partenaire_carburant",
   });
 
   const mutation = useMutation({
@@ -432,7 +437,7 @@ function FournisseurDialog({
             )}
             <div className="col-span-2 flex items-center gap-3">
               <Switch
-                checked={watch("is_partenaire_carburant") ?? false}
+                checked={isPartenaireCarburant ?? false}
                 onCheckedChange={(v) => setValue("is_partenaire_carburant", v)}
               />
               <Label>Partenaire carburant (solde global)</Label>
@@ -472,15 +477,20 @@ function ClientDialog({
   const {
     register,
     handleSubmit,
+    control,
     reset,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<ClientFormData>({
     resolver: zodResolver(
       clientSchema,
     ) as import("react-hook-form").Resolver<ClientFormData>,
     defaultValues: { credit_autorise: false },
+  });
+
+  const creditAutorise = useWatch({
+    control,
+    name: "credit_autorise",
   });
 
   const mutation = useMutation({
@@ -588,7 +598,7 @@ function ClientDialog({
             )}
             <div className="col-span-2 flex items-center gap-3">
               <Switch
-                checked={watch("credit_autorise") ?? false}
+                checked={creditAutorise ?? false}
                 onCheckedChange={(v) => setValue("credit_autorise", v)}
               />
               <Label>Crédit autorisé</Label>

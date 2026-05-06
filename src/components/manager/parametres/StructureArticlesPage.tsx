@@ -57,7 +57,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -173,6 +173,11 @@ export function StructureArticlesPage() {
     },
   });
 
+  const watchedFamille = useWatch({
+    control: articleForm.control,
+    name: "famille",
+  });
+
   const categorieForm = useForm<CategorieFormData>({
     resolver: zodResolver(
       categorieSchema,
@@ -278,7 +283,6 @@ export function StructureArticlesPage() {
     onError: (error) => toast.error("Erreur : " + (error as Error).message),
   });
 
-  const watchedFamille = articleForm.watch("famille");
   const familleCategoriesOptions = (categories ?? []).filter(
     (c) => c.famille === watchedFamille,
   );

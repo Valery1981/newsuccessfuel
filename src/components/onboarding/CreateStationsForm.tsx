@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -60,11 +60,16 @@ export function CreateStationsForm() {
   const {
     register,
     handleSubmit,
+    control,
     setValue,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<StationFormData>({
     resolver: zodResolver(stationSchema),
+  });
+
+  const partenaireId = useWatch({
+    control,
+    name: "partenaire_id",
   });
 
   const onSubmit = async (data: StationFormData) => {
@@ -122,18 +127,14 @@ export function CreateStationsForm() {
           <div className="space-y-2">
             <Label className="text-slate-200">Partenaire pétrolier</Label>
             <Select
-              value={watch("partenaire_id") || ""}
+              value={partenaireId || ""}
               onValueChange={(val: string | null) =>
                 setValue("partenaire_id", val ?? "")
               }
             >
               <SelectTrigger className="bg-white/10 border-white/20 text-white">
                 <SelectValue placeholder="Sélectionner un partenaire (optionnel)">
-                  {
-                    (partenaires ?? []).find(
-                      (p) => p.id === watch("partenaire_id"),
-                    )?.nom
-                  }
+                  {(partenaires ?? []).find((p) => p.id === partenaireId)?.nom}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>

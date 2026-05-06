@@ -72,13 +72,6 @@ export interface AccountsBundle {
   fixed_assets: FixedAssetAccount[];
 }
 
-interface BoutiqueInitItem {
-  product_id: string;
-  product_name: string;
-  family_name: string;
-  purchase_price: number;
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>

@@ -64,7 +64,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { useFieldArray, useForm, type Resolver } from "react-hook-form";
+import {
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Resolver,
+} from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -210,14 +215,29 @@ export function AchatBoutiquePage() {
     name: "lignes",
   });
 
-  const watchedLignes = form.watch("lignes");
-  const watchedFournisseurNonDefini = form.watch("fournisseur_non_defini");
-  const watchedFournisseurId = form.watch("fournisseur_id");
-  const watchedMontantCash = form.watch("montant_cash");
-  const watchedMontantCredit = form.watch("montant_credit");
+  const watchedLignes = useWatch({
+    control: form.control,
+    name: "lignes",
+  });
+  const watchedFournisseurNonDefini = useWatch({
+    control: form.control,
+    name: "fournisseur_non_defini",
+  });
+  const watchedFournisseurId = useWatch({
+    control: form.control,
+    name: "fournisseur_id",
+  });
+  const watchedMontantCash = useWatch({
+    control: form.control,
+    name: "montant_cash",
+  });
+  const watchedMontantCredit = useWatch({
+    control: form.control,
+    name: "montant_credit",
+  });
 
   const montantTotal = watchedLignes.reduce(
-    (acc, l) =>
+    (acc: number, l: z.infer<typeof ligneSchema>) =>
       acc + (Number(l.quantite) || 0) * (Number(l.prix_achat_unitaire) || 0),
     0,
   );
