@@ -6,10 +6,16 @@
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import { AnnualObjectiveTable } from "@/components/partner/AnnualObjectiveTable";
+import { DoleanceStats } from "@/components/partner/DoleanceStats";
+import { PartnerKPICards } from "@/components/partner/KPICards";
+import { MonthlyObjectiveTable } from "@/components/partner/MonthlyObjectiveTable";
+import { StationEcartTable } from "@/components/partner/StationEcartTable";
+import { StationFilter } from "@/components/partner/StationFilter";
+import { StockLevelTable } from "@/components/partner/StockLevelTable";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { formatCurrency } from "@/lib/utils";
 import { useAuthStore } from "@/stores/authStore";
 import { createClient } from "@/utils/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -20,11 +26,10 @@ import {
   CheckCircle,
   Clock,
   Fuel,
-  MapPin,
-  ShoppingBag,
   Target,
   TrendingUp,
 } from "lucide-react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -53,7 +58,6 @@ interface StationVolume {
   station_id: string;
   station_nom: string;
   volume_litres: number;
-  ca_boutique: number;
 }
 
 interface EcartData {
@@ -75,43 +79,25 @@ interface ObjectifRow {
   type: string;
 }
 
-interface KpiCardProps {
-  title: string;
-  value: string;
-  icon: React.ReactNode;
-  sub?: string;
-  danger?: boolean;
-}
-
-function KpiCard({ title, value, icon, sub, danger }: KpiCardProps) {
-  return (
-    <Card className={danger ? "border-red-500/50 bg-red-500/10" : ""}>
-      <CardContent className="pt-5 pb-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">
-              {title}
-            </p>
-            <p
-              className={`text-xl font-bold ${danger ? "text-red-400" : "text-foreground"}`}
-            >
-              {value}
-            </p>
-            {sub && (
-              <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
-            )}
-          </div>
-          <div className="rounded-lg p-2 bg-muted/50">{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export function PartnerDashboardPage() {
   const { compte } = useAuthStore();
   const depuis30j = subDays(new Date(), 30).toISOString().split("T")[0];
   const debutMois = startOfMonth(new Date()).toISOString().split("T")[0];
+
+  // État local pour le filtre de stations
+  const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
+
+  const handleStationToggle = (stationId: string) => {
+    setSelectedStationIds((prev) =>
+      prev.includes(stationId)
+        ? prev.filter((id) => id !== stationId)
+        : [...prev, stationId],
+    );
+  };
+
+  const handleClearAll = () => {
+    setSelectedStationIds([]);
+  };
 
   // Step 1: resolve partenaire_id from compte
   const { data: partenaire, isLoading: partLoading } = useQuery<{
@@ -148,31 +134,26 @@ export function PartnerDashboardPage() {
     staleTime: 10 * 60 * 1000,
   });
 
-  const stationIds = stations.map((s) => s.id);
+  const stationIds =
+    selectedStationIds.length > 0
+      ? selectedStationIds
+      : stations.map((s) => s.id);
 
-  // Volumes par station (litres ONLY — no CA carburant) + CA boutique
+  // Volumes par station (litres ONLY — no CA carburant, no CA boutique)
   const { data: volumesParStation = [], isLoading: volLoading } = useQuery<
     StationVolume[]
   >({
     queryKey: ["partner-volumes-stations", stationIds, depuis30j],
     queryFn: async () => {
       if (!stationIds.length) return [];
-      const [volRes, caRes] = await Promise.all([
-        supabase
-          .from("lignes_shift_carburant")
-          .select(
-            "volume_vendu, shifts_carburant!inner(station_id, date_shift)",
-          )
-          .in("shifts_carburant.station_id", stationIds)
-          .gte("shifts_carburant.date_shift", depuis30j),
-        supabase
-          .from("tickets_boutique")
-          .select("station_id, total")
-          .in("station_id", stationIds)
-          .gte("date_vente", depuis30j),
-      ]);
+      const { data: volRes } = await supabase
+        .from("lignes_shift_carburant")
+        .select("volume_vendu, shifts_carburant!inner(station_id, date_shift)")
+        .in("shifts_carburant.station_id", stationIds)
+        .gte("shifts_carburant.date_shift", depuis30j);
+
       const volMap = new Map<string, number>();
-      for (const row of volRes.data ?? []) {
+      for (const row of volRes ?? []) {
         const r = row as Record<string, unknown>;
         const shift = r.shifts_carburant as Record<string, unknown>;
         const sid = shift.station_id as string;
@@ -181,18 +162,11 @@ export function PartnerDashboardPage() {
           (volMap.get(sid) ?? 0) + ((r.volume_vendu as number) ?? 0),
         );
       }
-      const caMap = new Map<string, number>();
-      for (const row of caRes.data ?? []) {
-        const r = row as Record<string, unknown>;
-        const sid = r.station_id as string;
-        caMap.set(sid, (caMap.get(sid) ?? 0) + ((r.total as number) ?? 0));
-      }
       return stations
         .map((s) => ({
           station_id: s.id,
           station_nom: s.nom,
           volume_litres: volMap.get(s.id) ?? 0,
-          ca_boutique: caMap.get(s.id) ?? 0,
         }))
         .sort((a, b) => b.volume_litres - a.volume_litres);
     },
@@ -278,13 +252,12 @@ export function PartnerDashboardPage() {
         (s, v) => s + v.volume_litres,
         0,
       );
-      const totalCaB = volumesParStation.reduce((s, v) => s + v.ca_boutique, 0);
       return (objs as Record<string, unknown>[]).slice(0, 4).map((o) => {
         const type = o.type as string;
-        const realise = type === "ca_boutique" ? totalCaB : totalVol;
+        const realise = totalVol;
         const objectif = o.valeur as number;
         const stNom = (o.stations as { nom: string } | null)?.nom ?? "Réseau";
-        const label = `${stNom} – ${type === "ca_boutique" ? "CA boutique" : ((o.type_carburant as string) ?? type)}`;
+        const label = `${stNom} – ${(o.type_carburant as string) ?? type}`;
         return {
           label,
           taux:
@@ -303,12 +276,7 @@ export function PartnerDashboardPage() {
     (a, s) => a + s.volume_litres,
     0,
   );
-  const totalCaBoutique = volumesParStation.reduce(
-    (a, s) => a + s.ca_boutique,
-    0,
-  );
   const ecartTotal = ecartsData.reduce((a, e) => a + e.ecart, 0);
-  const nbDoleancesOuvertes = doleances.length;
 
   if (partLoading || stationsLoading || volLoading) return <PageLoading />;
 
@@ -331,32 +299,44 @@ export function PartnerDashboardPage() {
         description={`Vue synthétique du réseau — ${stations.length} station(s) active(s)`}
       />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-        <KpiCard
-          title="Volume réseau (30j)"
-          value={`${totalVolume.toLocaleString("fr-FR", { maximumFractionDigits: 0 })} L`}
-          icon={<Fuel className="w-5 h-5 text-blue-500" />}
-          sub="Litres carburant vendus"
-        />
-        <KpiCard
-          title="CA Boutique (30j)"
-          value={formatCurrency(totalCaBoutique)}
-          icon={
-            <ShoppingBag className="w-5 h-5" style={{ color: "#F5820A" }} />
-          }
-        />
-        <KpiCard
-          title="Stations actives"
-          value={stations.length.toString()}
-          icon={<MapPin className="w-5 h-5 text-amber-500" />}
-        />
-        <KpiCard
-          title="Doléances ouvertes"
-          value={nbDoleancesOuvertes.toString()}
-          icon={<AlertCircle className="w-5 h-5 text-red-500" />}
-          danger={nbDoleancesOuvertes > 0}
-        />
+      {/* Station Filter */}
+      {stations.length > 0 && (
+        <div className="mb-6">
+          <StationFilter
+            stations={stations}
+            selectedStationIds={selectedStationIds}
+            onStationToggle={handleStationToggle}
+            onClearAll={handleClearAll}
+          />
+        </div>
+      )}
+
+      {/* KPIs - Nouveaux KPIs selon DIFF.md */}
+      <PartnerKPICards stationIds={stationIds} />
+
+      {/* Stock Level Table */}
+      <div className="mt-6">
+        <StockLevelTable stationIds={stationIds} />
+      </div>
+
+      {/* Monthly Objective Table */}
+      <div className="mt-6">
+        <MonthlyObjectiveTable stationIds={stationIds} />
+      </div>
+
+      {/* Annual Objective Table */}
+      <div className="mt-6">
+        <AnnualObjectiveTable stationIds={stationIds} />
+      </div>
+
+      {/* Station Ecart Table */}
+      <div className="mt-6">
+        <StationEcartTable stationIds={stationIds} />
+      </div>
+
+      {/* Doleance Stats */}
+      <div className="mt-6">
+        <DoleanceStats stationIds={stationIds} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
