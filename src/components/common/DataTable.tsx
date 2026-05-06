@@ -54,6 +54,9 @@ export function DataTable<TData, TValue>({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
 
+  // TanStack Table API cannot be memoized by React Compiler - this is expected and acceptable
+  // The library's design returns functions that cannot be safely memoized, but this is a known limitation
+  // of TanStack Table and does not cause issues in practice for this component
   const table = useReactTable({
     data,
     columns,

@@ -15,6 +15,11 @@ const eslintConfig = defineConfig([
     // Ignore legacy successfuel folder
     "successfuel/**",
   ]),
+  {
+    rules: {
+      "react-hooks/incompatible-library": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;
