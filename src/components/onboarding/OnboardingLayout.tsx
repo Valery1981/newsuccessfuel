@@ -1,8 +1,8 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Check } from "lucide-react";
+import { usePathname } from "next/navigation";
 
 const steps = [
   { label: "Entreprise", path: "/company" },
@@ -18,7 +18,7 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
   const currentStepIndex = steps.findIndex((s) => pathname.startsWith(s.path));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <div className="border-b border-white/10 py-4 px-6">
         <div className="flex items-center gap-2 max-w-4xl mx-auto">
@@ -38,7 +38,7 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
               const isCurrent = index === currentStepIndex;
 
               return (
-                <div key={step.path} className="flex items-center flex-shrink-0">
+                <div key={step.path} className="flex items-center shrink-0">
                   <div className="flex flex-col items-center">
                     <div
                       className={cn(
@@ -46,8 +46,8 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
                         isCompleted
                           ? "bg-amber-500 border-amber-500 text-white"
                           : isCurrent
-                          ? "border-amber-500 text-amber-400 bg-transparent"
-                          : "border-slate-600 text-slate-500 bg-transparent"
+                            ? "border-amber-500 text-amber-400 bg-transparent"
+                            : "border-slate-600 text-slate-500 bg-transparent",
                       )}
                     >
                       {isCompleted ? (
@@ -59,7 +59,11 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
                     <span
                       className={cn(
                         "text-xs mt-1 hidden sm:block",
-                        isCurrent ? "text-amber-400" : isCompleted ? "text-slate-300" : "text-slate-500"
+                        isCurrent
+                          ? "text-amber-400"
+                          : isCompleted
+                            ? "text-slate-300"
+                            : "text-slate-500",
                       )}
                     >
                       {step.label}
@@ -69,7 +73,9 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
                     <div
                       className={cn(
                         "h-0.5 w-8 sm:w-16 mx-1",
-                        index < currentStepIndex ? "bg-amber-500" : "bg-slate-700"
+                        index < currentStepIndex
+                          ? "bg-amber-500"
+                          : "bg-slate-700",
                       )}
                     />
                   )}
@@ -81,9 +87,7 @@ export function OnboardingLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Content */}
-      <div className="max-w-2xl mx-auto px-4 pb-12">
-        {children}
-      </div>
+      <div className="max-w-2xl mx-auto px-4 pb-12">{children}</div>
     </div>
   );
 }
