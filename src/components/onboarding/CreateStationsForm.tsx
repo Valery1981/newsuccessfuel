@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { stationService } from "@/services/stationService";
+import { tmService } from "@/services/tmService";
 import { useAuthStore } from "@/stores/authStore";
 import { createClient } from "@/utils/supabase/client";
 
@@ -34,6 +35,7 @@ const supabase = createClient();
 const stationSchema = z.object({
   nom: z.string().min(2, "Nom minimum 2 caractères").max(255),
   partenaire_id: z.string().optional(),
+  tm_id: z.string().min(1, "TM obligatoire"),
   adresse: z.string().optional(),
   telephone: z.string().optional(),
 });
@@ -57,6 +59,13 @@ export function CreateStationsForm() {
     },
   });
 
+  const { data: tms } = useQuery({
+    queryKey: ["tms"],
+    queryFn: async () => {
+      return tmService.getTMs();
+    },
+  });
+
   const {
     register,
     handleSubmit,
@@ -72,6 +81,11 @@ export function CreateStationsForm() {
     name: "partenaire_id",
   });
 
+  const tmId = useWatch({
+    control,
+    name: "tm_id",
+  });
+
   const onSubmit = async (data: StationFormData) => {
     if (!entreprise) {
       toast.error("Veuillez d'abord créer votre entreprise");
@@ -84,6 +98,7 @@ export function CreateStationsForm() {
         ...data,
         entreprise_id: entreprise.id,
         partenaire_id: data.partenaire_id || undefined,
+        tm_id: data.tm_id,
         status: "en_attente",
         onboarding_step: "cuves",
       });
@@ -146,6 +161,34 @@ export function CreateStationsForm() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="tm_id" className="text-slate-200">
+              Territory Manager <span className="text-red-400">*</span>
+            </Label>
+            <Select
+              value={tmId || ""}
+              onValueChange={(val: string | null) =>
+                setValue("tm_id", val ?? "")
+              }
+            >
+              <SelectTrigger className="bg-white/10 border-white/20 text-white">
+                <SelectValue placeholder="Sélectionner un TM">
+                  {(tms ?? []).find((tm) => tm.id === tmId)?.nom}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {(tms ?? []).map((tm) => (
+                  <SelectItem key={tm.id} value={tm.id}>
+                    {tm.nom}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.tm_id && (
+              <p className="text-red-400 text-sm">{errors.tm_id.message}</p>
+            )}
           </div>
 
           <div className="space-y-2">

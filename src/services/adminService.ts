@@ -182,15 +182,17 @@ export const adminService = {
     pageSize: number,
     statusFilter?: StationStatus,
     partenaireFilter?: string,
+    tmFilter?: string,
   ): Promise<{ data: StationAvecRelations[]; count: number }> {
     let query = supabase
       .from("stations")
       .select(
-        "id, nom, adresse, status, created_at, entreprise_id, partenaire_id, entreprises(nom), partenaires(nom)",
+        "id, nom, adresse, status, created_at, entreprise_id, partenaire_id, tm_id, entreprises(nom), partenaires(nom)",
         { count: "exact" },
       );
     if (statusFilter) query = query.eq("status", statusFilter);
     if (partenaireFilter) query = query.eq("partenaire_id", partenaireFilter);
+    if (tmFilter) query = query.eq("tm_id", tmFilter);
     const from = page * pageSize;
     const to = from + pageSize - 1;
     const { data, error, count } = await query

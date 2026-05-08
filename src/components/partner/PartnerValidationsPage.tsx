@@ -35,7 +35,7 @@ import {
   type StationWithEntreprise,
 } from "@/services/partnerService";
 import { useAuthStore } from "@/stores/authStore";
-import type { StationStatus } from "@/types/supabase";
+import type { Database } from "@/types/supabase";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -52,6 +52,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+
+type StationStatus = Database["public"]["Enums"]["station_status"];
 
 type FiltreStatut = StationStatus | "tous";
 

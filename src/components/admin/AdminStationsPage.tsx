@@ -81,6 +81,8 @@ type ConfirmAction = {
 export function AdminStationsPage() {
   const { compte } = useAuthStore();
   const qc = useQueryClient();
+
+  const isTM = (compte?.type as string) === "tm";
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<StationStatus | "tous">(
     "tous",
@@ -94,15 +96,23 @@ export function AdminStationsPage() {
   const statutPourApi = statusFilter === "tous" ? undefined : statusFilter;
   const partenairePourApi =
     partenaireFilter === "tous" ? undefined : partenaireFilter;
+  const tmPourApi = isTM ? compte?.id : undefined;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin-stations", page, statusFilter, partenaireFilter],
+    queryKey: [
+      "admin-stations",
+      page,
+      statusFilter,
+      partenaireFilter,
+      tmPourApi,
+    ],
     queryFn: () =>
       adminService.getAllStations(
         page,
         PAGE_SIZE,
         statutPourApi,
         partenairePourApi,
+        tmPourApi,
       ),
   });
 
@@ -261,7 +271,7 @@ export function AdminStationsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {s.status === "en_attente" && (
+                          {!isTM && s.status === "en_attente" && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -278,7 +288,7 @@ export function AdminStationsPage() {
                               Valider
                             </Button>
                           )}
-                          {s.status === "validee" && (
+                          {!isTM && s.status === "validee" && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -295,7 +305,7 @@ export function AdminStationsPage() {
                               Suspendre
                             </Button>
                           )}
-                          {s.status === "suspendue" && (
+                          {!isTM && s.status === "suspendue" && (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -311,6 +321,11 @@ export function AdminStationsPage() {
                               <RotateCcw className="w-4 h-4 mr-1" />
                               Réactiver
                             </Button>
+                          )}
+                          {isTM && (
+                            <span className="text-xs text-muted-foreground">
+                              Validation non autorisée
+                            </span>
                           )}
                         </div>
                       </TableCell>

@@ -1,31 +1,12 @@
 ﻿"use client";
 
-import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import {
-  Building2,
-  CheckCircle,
-  Clock,
-  ShoppingBag,
-  Droplets,
-  Flame,
-  Car,
-  MapPin,
-  Phone,
-  LayoutGrid,
-  List,
-  XCircle,
-  Target,
-  ChevronRight,
-  Settings,
-} from "lucide-react";
+import { EmptyState } from "@/components/common/EmptyState";
+import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { PageLoading } from "@/components/common/LoadingSpinner";
-import { EmptyState } from "@/components/common/EmptyState";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -47,9 +28,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  partnerService,
+  type ObjectifRow,
+  type StationWithEntreprise,
+} from "@/services/partnerService";
+import { tmService } from "@/services/tmService";
 import { useAuthStore } from "@/stores/authStore";
-import { partnerService, type StationWithEntreprise, type ObjectifRow } from "@/services/partnerService";
-import type { StationStatus } from "@/types/supabase";
+import type { Database } from "@/types/supabase";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Building2,
+  Car,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  Droplets,
+  Flame,
+  LayoutGrid,
+  List,
+  MapPin,
+  Phone,
+  Settings,
+  ShoppingBag,
+  Target,
+  XCircle,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+
+type StationStatus = Database["public"]["Enums"]["station_status"];
 
 type FiltreStatut = StationStatus | "tous";
 type VueMode = "grille" | "liste";
@@ -62,9 +70,18 @@ const OBJECTIF_TYPE_LABELS: Record<string, string> = {
 
 function StatutBadge({ statut }: { statut: StationStatus }) {
   const map: Record<StationStatus, { label: string; className: string }> = {
-    en_attente: { label: "En attente", className: "bg-orange-100 text-orange-700 border-orange-200" },
-    validee: { label: "Validée", className: "bg-green-100 text-green-700 border-green-200" },
-    suspendue: { label: "Suspendue", className: "bg-red-100 text-red-700 border-red-200" },
+    en_attente: {
+      label: "En attente",
+      className: "bg-orange-100 text-orange-700 border-orange-200",
+    },
+    validee: {
+      label: "Validée",
+      className: "bg-green-100 text-green-700 border-green-200",
+    },
+    suspendue: {
+      label: "Suspendue",
+      className: "bg-red-100 text-red-700 border-red-200",
+    },
   };
   const { label, className } = map[statut] ?? { label: statut, className: "" };
   return (
@@ -76,13 +93,34 @@ function StatutBadge({ statut }: { statut: StationStatus }) {
 
 function ServicesBadges({ station }: { station: StationWithEntreprise }) {
   const services = [
-    station.has_boutique && { label: "Boutique", icon: ShoppingBag, color: "text-blue-500" },
-    station.has_lubrifiants && { label: "Lubrifiants", icon: Droplets, color: "text-yellow-500" },
+    station.has_boutique && {
+      label: "Boutique",
+      icon: ShoppingBag,
+      color: "text-blue-500",
+    },
+    station.has_lubrifiants && {
+      label: "Lubrifiants",
+      icon: Droplets,
+      color: "text-yellow-500",
+    },
     station.has_gpl && { label: "GPL", icon: Flame, color: "text-orange-500" },
-    station.has_lavage && { label: "Lavage", icon: Car, color: "text-teal-500" },
-  ].filter(Boolean) as { label: string; icon: React.ComponentType<{ className?: string }>; color: string }[];
+    station.has_lavage && {
+      label: "Lavage",
+      icon: Car,
+      color: "text-teal-500",
+    },
+  ].filter(Boolean) as {
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    color: string;
+  }[];
 
-  if (services.length === 0) return <span className="text-sm text-muted-foreground">Carburant uniquement</span>;
+  if (services.length === 0)
+    return (
+      <span className="text-sm text-muted-foreground">
+        Carburant uniquement
+      </span>
+    );
 
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -115,7 +153,9 @@ function StationCard({
           <StatutBadge statut={station.status ?? "en_attente"} />
         </div>
         {station.entreprises?.nom && (
-          <p className="text-xs text-muted-foreground">{station.entreprises.nom}</p>
+          <p className="text-xs text-muted-foreground">
+            {station.entreprises.nom}
+          </p>
         )}
       </CardHeader>
       <CardContent className="space-y-3 pt-0">
@@ -169,22 +209,35 @@ function ObjectifsSection({ stationId }: { stationId: string }) {
   });
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Chargement des objectifs...</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Chargement des objectifs...
+      </p>
+    );
   }
 
   if (objectifs.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucun objectif actif pour la période en cours.</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        Aucun objectif actif pour la période en cours.
+      </p>
+    );
   }
 
   return (
     <div className="space-y-2">
       {objectifs.map((obj: ObjectifRow) => (
-        <div key={obj.id} className="flex items-center justify-between rounded-lg border p-3">
+        <div
+          key={obj.id}
+          className="flex items-center justify-between rounded-lg border p-3"
+        >
           <div>
             <p className="text-sm font-medium">
               {OBJECTIF_TYPE_LABELS[obj.type] ?? obj.type}
               {obj.type_carburant && (
-                <span className="ml-1 text-muted-foreground">({obj.type_carburant})</span>
+                <span className="ml-1 text-muted-foreground">
+                  ({obj.type_carburant})
+                </span>
               )}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -208,10 +261,41 @@ function StationDetailDialog({
   station: StationWithEntreprise | null;
   onClose: () => void;
 }) {
+  const { data: tms } = useQuery({
+    queryKey: ["tms"],
+    queryFn: () => tmService.getTMs(),
+  });
+
+  const handleAssignTM = async (tmId: string | null) => {
+    if (!tmId) return;
+    try {
+      await tmService.assignTMToStation(station!.id, tmId);
+      toast.success("TM assigné avec succès");
+      window.location.reload();
+    } catch {
+      toast.error("Erreur lors de l'assignation du TM");
+    }
+  };
+
+  const handleRemoveTM = async () => {
+    try {
+      await tmService.removeTMFromStation(station!.id);
+      toast.success("TM retiré avec succès");
+      window.location.reload();
+    } catch {
+      toast.error("Erreur lors du retrait du TM");
+    }
+  };
+
   if (!station) return null;
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -229,7 +313,10 @@ function StationDetailDialog({
               <div className="flex items-center gap-2">
                 <StatutBadge statut={station.status ?? "en_attente"} />
                 {station.initialisation_validee && (
-                  <Badge variant="outline" className="bg-teal-50 text-teal-700 border-teal-200 text-xs">
+                  <Badge
+                    variant="outline"
+                    className="bg-teal-50 text-teal-700 border-teal-200 text-xs"
+                  >
                     Initialisée
                   </Badge>
                 )}
@@ -251,6 +338,61 @@ function StationDetailDialog({
                   <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <span>{station.telephone}</span>
                 </div>
+              )}
+            </div>
+          </section>
+
+          {/* Assignation TM */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Territory Manager
+            </h3>
+            <div className="space-y-2">
+              <Select
+                value={
+                  (station as StationWithEntreprise & { tm_id?: string | null })
+                    .tm_id || ""
+                }
+                onValueChange={handleAssignTM}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Assigner un TM">
+                    {(
+                      station as StationWithEntreprise & {
+                        tm_id?: string | null;
+                      }
+                    ).tm_id
+                      ? tms?.find(
+                          (tm) =>
+                            tm.id ===
+                            (
+                              station as StationWithEntreprise & {
+                                tm_id?: string | null;
+                              }
+                            ).tm_id,
+                        )?.nom
+                      : "Aucun TM assigné"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Aucun TM</SelectItem>
+                  {tms?.map((tm) => (
+                    <SelectItem key={tm.id} value={tm.id}>
+                      {tm.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(station as StationWithEntreprise & { tm_id?: string | null })
+                .tm_id && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleRemoveTM}
+                  className="text-red-600"
+                >
+                  Retirer le TM
+                </Button>
               )}
             </div>
           </section>
@@ -295,7 +437,8 @@ export function PartnerStationsPage() {
   const { compte } = useAuthStore();
   const [filtreStatut, setFiltreStatut] = useState<FiltreStatut>("tous");
   const [vue, setVue] = useState<VueMode>("grille");
-  const [stationDetail, setStationDetail] = useState<StationWithEntreprise | null>(null);
+  const [stationDetail, setStationDetail] =
+    useState<StationWithEntreprise | null>(null);
 
   const { data: partenaire, isLoading: loadingPartenaire } = useQuery({
     queryKey: ["partenaire", compte?.id],
@@ -312,9 +455,9 @@ export function PartnerStationsPage() {
   const stationsFiltrees = useMemo(
     () =>
       stations.filter((s) =>
-        filtreStatut === "tous" ? true : s.status === filtreStatut
+        filtreStatut === "tous" ? true : s.status === filtreStatut,
       ),
-    [stations, filtreStatut]
+    [stations, filtreStatut],
   );
 
   const stats = useMemo(
@@ -324,7 +467,7 @@ export function PartnerStationsPage() {
       enAttente: stations.filter((s) => s.status === "en_attente").length,
       avecBoutique: stations.filter((s) => s.has_boutique).length,
     }),
-    [stations]
+    [stations],
   );
 
   if (loadingPartenaire || loadingStations) return <PageLoading />;
@@ -406,7 +549,10 @@ export function PartnerStationsPage() {
 
       {/* Filtre statut */}
       <div className="flex items-center gap-2">
-        <Select value={filtreStatut} onValueChange={(v) => setFiltreStatut(v as FiltreStatut)}>
+        <Select
+          value={filtreStatut}
+          onValueChange={(v) => setFiltreStatut(v as FiltreStatut)}
+        >
           <SelectTrigger className="w-44">
             <SelectValue placeholder="Filtrer par statut" />
           </SelectTrigger>
@@ -443,11 +589,17 @@ export function PartnerStationsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Nom</TableHead>
-                  <TableHead className="hidden md:table-cell">Entreprise</TableHead>
-                  <TableHead className="hidden lg:table-cell">Adresse</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    Entreprise
+                  </TableHead>
+                  <TableHead className="hidden lg:table-cell">
+                    Adresse
+                  </TableHead>
                   <TableHead>Services</TableHead>
                   <TableHead>Statut</TableHead>
-                  <TableHead className="hidden sm:table-cell">Initialisation</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Initialisation
+                  </TableHead>
                   <TableHead className="text-right">Détails</TableHead>
                 </TableRow>
               </TableHeader>
@@ -462,7 +614,9 @@ export function PartnerStationsPage() {
                       {station.adresse ? (
                         <span className="flex items-center gap-1">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate max-w-[160px]">{station.adresse}</span>
+                          <span className="truncate max-w-[160px]">
+                            {station.adresse}
+                          </span>
                         </span>
                       ) : (
                         "—"
@@ -472,27 +626,44 @@ export function PartnerStationsPage() {
                       <div className="flex items-center gap-1">
                         {station.has_boutique && (
                           <span title="Boutique">
-                            <ShoppingBag className="h-4 w-4 text-blue-500" aria-hidden />
+                            <ShoppingBag
+                              className="h-4 w-4 text-blue-500"
+                              aria-hidden
+                            />
                           </span>
                         )}
                         {station.has_lubrifiants && (
                           <span title="Lubrifiants">
-                            <Droplets className="h-4 w-4 text-yellow-500" aria-hidden />
+                            <Droplets
+                              className="h-4 w-4 text-yellow-500"
+                              aria-hidden
+                            />
                           </span>
                         )}
                         {station.has_gpl && (
                           <span title="GPL">
-                            <Flame className="h-4 w-4 text-orange-500" aria-hidden />
+                            <Flame
+                              className="h-4 w-4 text-orange-500"
+                              aria-hidden
+                            />
                           </span>
                         )}
                         {station.has_lavage && (
                           <span title="Lavage">
-                            <Car className="h-4 w-4 text-teal-500" aria-hidden />
+                            <Car
+                              className="h-4 w-4 text-teal-500"
+                              aria-hidden
+                            />
                           </span>
                         )}
-                        {!station.has_boutique && !station.has_lubrifiants && !station.has_gpl && !station.has_lavage && (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
+                        {!station.has_boutique &&
+                          !station.has_lubrifiants &&
+                          !station.has_gpl &&
+                          !station.has_lavage && (
+                            <span className="text-xs text-muted-foreground">
+                              —
+                            </span>
+                          )}
                       </div>
                     </TableCell>
                     <TableCell>

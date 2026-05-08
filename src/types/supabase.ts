@@ -3240,6 +3240,7 @@ export type Database = {
           partenaire_id: string | null
           status: Database["public"]["Enums"]["station_status"] | null
           telephone: string | null
+          tm_id: string | null
           updated_at: string | null
           valide_at: string | null
           valide_par: string | null
@@ -3267,6 +3268,7 @@ export type Database = {
           partenaire_id?: string | null
           status?: Database["public"]["Enums"]["station_status"] | null
           telephone?: string | null
+          tm_id?: string | null
           updated_at?: string | null
           valide_at?: string | null
           valide_par?: string | null
@@ -3294,6 +3296,7 @@ export type Database = {
           partenaire_id?: string | null
           status?: Database["public"]["Enums"]["station_status"] | null
           telephone?: string | null
+          tm_id?: string | null
           updated_at?: string | null
           valide_at?: string | null
           valide_par?: string | null
@@ -3325,6 +3328,13 @@ export type Database = {
             columns: ["partenaire_id"]
             isOneToOne: false
             referencedRelation: "partenaires"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stations_tm_id_fkey"
+            columns: ["tm_id"]
+            isOneToOne: false
+            referencedRelation: "comptes"
             referencedColumns: ["id"]
           },
           {
@@ -4138,7 +4148,7 @@ export type Database = {
       }
     }
     Enums: {
-      account_type: "superadmin" | "gerant" | "partenaire"
+      account_type: "superadmin" | "gerant" | "partenaire" | "tm"
       achat_statut:
         | "commande"
         | "brouillon"
@@ -4317,7 +4327,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      account_type: ["superadmin", "gerant", "partenaire"],
+      account_type: ["superadmin", "gerant", "partenaire", "tm"],
       achat_statut: [
         "commande",
         "brouillon",
@@ -4378,16 +4388,3 @@ export const Constants = {
   },
 } as const
 
-// ── Helpers custom (préservés depuis ancienne version) ─────────────────────────
-export type AccountType = Enums<"account_type">;
-export type AchatStatut = Enums<"achat_statut">;
-export type FamilleProduit = Enums<"famille_produit">;
-export type DoleanceStatut = Enums<"doleance_statut">;
-export type StationStatus = Enums<"station_status">;
-export type MotifEcart = Enums<"motif_ecart">;
-export type EcritureStatut = Enums<"ecriture_statut">;
-export type TiersType = Enums<"tiers_type">;
-export type InventaireStatut = Enums<"inventaire_statut">;
-export type InventaireType = Enums<"inventaire_type">;
-export type ShiftStatut = Enums<"shift_statut">;
-export type SessionStatus = Enums<"session_status">;
