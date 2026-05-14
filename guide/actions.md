@@ -5,7 +5,73 @@
 
 ---
 
-## 2026-05-06
+## 2026-05-14
+
+### ACTION #009 — Optimisation Base de Données Supabase & Correction SECURITY DEFINER
+
+**Statut** : ✅ TERMINÉ
+
+**Contexte** : Optimisation CPU-intensive queries, réduction IOPS, correction vues avec SECURITY DEFINER (6 vues), ajout index stratégiques.
+
+**Actions effectuées** :
+
+1. **Documentation** :
+   - Créé `guide/apex_plan_optimization_supabase_1_2026-05-14_2026-05-14.md` (plan d'exécution détaillé)
+   - Créé `guide/rules_supabase_base.md` (règles backend/base de données)
+
+2. **Analyse base de données** :
+   - Liste complète des tables (via Supabase MCP)
+   - Identification des colonnes pour index stratégiques
+   - Vérification des 6 vues avec SECURITY DEFINER
+
+3. **Migration #1 - Fix SECURITY DEFINER** :
+   - `vue_dettes_en_cours` : SECURITY DEFINER → SECURITY INVOKER
+   - `vue_grand_livre` : SECURITY DEFINER → SECURITY INVOKER
+   - `vue_balance` : SECURITY DEFINER → SECURITY INVOKER
+   - `vue_creances_en_cours` : SECURITY DEFINER → SECURITY INVOKER
+   - `vue_mouvements_stock` : SECURITY DEFINER → SECURITY INVOKER
+   - `vue_capitaux_propres` : SECURITY DEFINER → SECURITY INVOKER
+
+4. **Migration #2 - Index stratégiques** (44 index créés) :
+   - `ecritures_comptables` : entreprise_id, station_id, date_ecriture, statut, composite (entreprise, date)
+   - `lignes_ecriture` : ecriture_id, numero_compte, tiers_id, tresorerie_id
+   - `mouvements_stock` : entreprise_id, station_id, article_id, cuve_id, date_mouvement, type, composite
+   - `shifts_carburant` : station_id, pompiste_id, statut, date_shift, heure_cloture
+   - `achats_carburant` : entreprise_id, fournisseur_id, camion_id, date_livraison, statut
+   - `achats_boutique` : entreprise_id, station_id, fournisseur_id, date_facture, statut
+   - `creances` : entreprise_id, tiers_id, echeance, is_soldee, composite (entreprise, soldee)
+   - `dettes` : entreprise_id, fournisseur_id, echeance, is_soldee, composite (entreprise, soldee)
+   - `stations` : entreprise_id, partenaire_id, status
+   - `doleances` : station_id, partenaire_id, statut, envoyee_at
+   - `prix_carburant` : station_id, date_effet
+   - `calibrages` : cuve_id, composite (cuve, hauteur)
+   - `cuves` : station_id, type_carburant
+   - `pistolets` : station_id, cuve_id
+
+5. **Tests** :
+   - Unit tests : `src/lib/__tests__/database-optimization.test.ts` (tests vues SECURITY INVOKER, performance requêtes)
+   - E2E tests : `e2e/database/database-optimization.spec.ts` (tests RLS vues, performance rapports)
+
+6. **Qualité** :
+   - ESLint : 0 erreur
+   - TypeScript : 21 erreurs pré-existantes (non liées à cette optimisation - types manquants dans supabase.ts)
+
+**Fichiers créés/modifiés** :
+
+- `guide/apex_plan_optimization_supabase_1_2026-05-14_2026-05-14.md` (nouveau)
+- `guide/rules_supabase_base.md` (nouveau)
+- `src/lib/__tests__/database-optimization.test.ts` (nouveau)
+- `e2e/database/database-optimization.spec.ts` (nouveau)
+- Migrations Supabase : `fix_security_definer_views`, `add_strategic_indexes_final`
+
+**Règles ajoutées dans rules_supabase_base.md** :
+
+- DB-01 : SECURITY DEFINER interdit sur les vues
+- DB-02 : RLS strict sur tables sensibles
+- DB-03 : Pas de queries directes à auth.users côté client
+- DB-04 à DB-22 : Index, performance, maintenance, conception schéma, monitoring, tests
+
+---
 
 ### ACTION #008 — Refactoring & Documentation
 

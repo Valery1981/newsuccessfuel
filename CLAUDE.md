@@ -173,3 +173,23 @@ Chaque commande contient :
 - Les sessions employés héritent des droits du compte parent + restrictions supplémentaires
 - Pas de queries directes à `auth.users` côté client — passer par la table `comptes`
 - `SUPABASE_SERVICE_ROLE_KEY` : serveur uniquement, jamais exposée côté client
+
+---
+
+## Processus de Fin de Session — OBLIGATOIRE
+
+**À la fin de CHAQUE session de travail, avant de faire `git add commit push` :**
+
+1. **Tests unitaires** : `npm run test` (Vitest)
+2. **Tests E2E** : `npm run test:e2e` (Playwright)
+3. **Linting** : `npm run lint` (ESLint) — doit être 0 erreur
+4. **TypeScript** : `npx tsc --noEmit` — doit être 0 erreur
+5. **Build** : `npm run build` — doit réussir
+
+**SEULEMENT après que tous les checks passent :**
+
+- `git add .`
+- `git commit -m "description"`
+- `git push`
+
+Cette règle est NON NÉGOCIABLE et s'applique à TOUTES les modifications, même mineures.
