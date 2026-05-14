@@ -5,6 +5,53 @@
 
 ---
 
+## 2026-05-14 (session 2)
+
+### ACTION #010 — Correction TypeScript, Warnings Supabase & "Configurer Droits" ManagerUsersPage
+
+**Statut** : ✅ TERMINÉ
+
+**Contexte** : Le build échouait à cause de 21 erreurs TypeScript (types manquants dans supabase.ts). Des warnings Supabase de sécurité (function_search_path_mutable, anon_security_definer, materialized_view_in_api, rls_policy_always_true) devaient être corrigés. Le bouton "Configurer droits" manquait dans ManagerUsersPage.
+
+**Actions effectuées** :
+
+1. **Fix TypeScript (src/types/supabase.ts)** :
+   - Ajout de 16 type aliases nommés pour les enums DB : `AccountType`, `AchatStatut`, `DoleanceStatut`, `EcritureStatut`, `FamilleProduit`, `InventaireStatut`, `InventaireType`, `MotifEcart`, `MouvementType`, `NotifType`, `OperationHorsAvType`, `PartenaireType`, `SessionStatus`, `ShiftStatut`, `StationStatus`, `TiersType`
+   - Fix `AdminStationsPage.tsx` : ajout entrée `rejetee` manquante dans `STATUS_CONFIG`
+   - Fix `WaitingValidationPage.tsx` : ajout entrée `rejetee` manquante dans `STATUS_MAP`
+
+2. **Migration Supabase `fix_function_search_paths_and_security`** :
+   - `SET search_path = 'public'` sur 21 fonctions (fix function_search_path_mutable)
+   - `REVOKE EXECUTE FROM anon` sur 7 fonctions SECURITY DEFINER (fix anon_security_definer_function_executable)
+   - `REVOKE EXECUTE FROM authenticated` sur 3 fonctions trigger/event-only (create_compte_gerant, fn_audit_log, rls_auto_enable)
+   - `REVOKE SELECT FROM anon` sur 3 vues matérialisées (mv_ca_mensuel, mv_capitaux_propres, mv_stocks_valorises)
+   - Fix politique RLS `authenticated_audit_insert` sur `audit_log` : WITH CHECK restrictif au lieu de `true`
+
+3. **ManagerUsersPage.tsx** :
+   - Ajout menu item "Configurer droits" dans le DropdownMenu de chaque session
+   - Import icône `Settings` de lucide-react
+
+4. **Fix test database-optimization.test.ts** :
+   - Remplacement du vrai client Supabase par un mock `vi.mock()` pour éviter l'échec en environnement sans vars d'env
+
+**Résultats** :
+
+- TypeScript : 0 erreur ✅
+- ESLint : 0 erreur ✅
+- Build : ✅ succès
+- Tests : 23/23 fichiers, 143 tests ✅
+
+**Fichiers modifiés** :
+
+- `src/types/supabase.ts` (16 type aliases ajoutés)
+- `src/components/admin/AdminStationsPage.tsx` (rejetee dans STATUS_CONFIG)
+- `src/components/onboarding/WaitingValidationPage.tsx` (rejetee dans STATUS_MAP)
+- `src/components/manager/ManagerUsersPage.tsx` (menu item Configurer droits)
+- `src/lib/__tests__/database-optimization.test.ts` (mock Supabase client)
+- Migration : `fix_function_search_paths_and_security`
+
+---
+
 ## 2026-05-14
 
 ### ACTION #009 — Optimisation Base de Données Supabase & Correction SECURITY DEFINER

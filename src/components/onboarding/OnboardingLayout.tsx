@@ -5,12 +5,12 @@ import { Check } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 const steps = [
-  { label: "Entreprise", path: "/company" },
+  { label: "Entreprise", path: "/entreprise" },
   { label: "Station", path: "/station" },
   { label: "Cuves", path: "/cuves" },
   { label: "Pistolets", path: "/pistolets" },
   { label: "Boutique", path: "/boutique" },
-  { label: "Validation", path: "/validation" },
+  { label: "Validation", path: "/attente" },
 ];
 
 export function OnboardingLayout({ children }: { children: React.ReactNode }) {

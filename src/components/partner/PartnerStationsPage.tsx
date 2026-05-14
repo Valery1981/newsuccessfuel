@@ -33,11 +33,13 @@ import {
   type ObjectifRow,
   type StationWithEntreprise,
 } from "@/services/partnerService";
+import { stationService } from "@/services/stationService";
 import { tmService } from "@/services/tmService";
 import { useAuthStore } from "@/stores/authStore";
 import type { Database } from "@/types/supabase";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Ban,
   Building2,
   Car,
   CheckCircle,
@@ -48,6 +50,7 @@ import {
   LayoutGrid,
   List,
   MapPin,
+  Pause,
   Phone,
   Settings,
   ShoppingBag,
@@ -75,11 +78,15 @@ function StatutBadge({ statut }: { statut: StationStatus }) {
       className: "bg-orange-100 text-orange-700 border-orange-200",
     },
     validee: {
-      label: "Validée",
+      label: "Active",
       className: "bg-green-100 text-green-700 border-green-200",
     },
     suspendue: {
       label: "Suspendue",
+      className: "bg-red-100 text-red-700 border-red-200",
+    },
+    rejetee: {
+      label: "Rejetée",
       className: "bg-red-100 text-red-700 border-red-200",
     },
   };
@@ -261,10 +268,42 @@ function StationDetailDialog({
   station: StationWithEntreprise | null;
   onClose: () => void;
 }) {
+  const { compte } = useAuthStore();
+  const queryClient = useQueryClient();
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
   const { data: tms } = useQuery({
     queryKey: ["tms"],
     queryFn: () => tmService.getTMs(),
   });
+
+  const handleChangeStatus = async (newStatus: StationStatus) => {
+    if (!station) return;
+    setUpdatingStatus(true);
+    try {
+      const updateData: Record<string, unknown> = { status: newStatus };
+      if (newStatus === "validee") {
+        updateData.valide_par = compte?.id ?? null;
+        updateData.valide_at = new Date().toISOString();
+      }
+      await stationService.updateStation(station.id, updateData);
+      await queryClient.invalidateQueries({
+        queryKey: ["stations-partenaire"],
+      });
+      const labels: Record<string, string> = {
+        validee: "Station activée",
+        suspendue: "Station suspendue",
+        rejetee: "Station rejetée",
+        en_attente: "Station mise en attente",
+      };
+      toast.success(labels[newStatus] ?? "Statut mis à jour");
+      onClose();
+    } catch {
+      toast.error("Erreur lors du changement de statut");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
 
   const handleAssignTM = async (tmId: string | null) => {
     if (!tmId) return;
@@ -351,28 +390,12 @@ function StationDetailDialog({
               <Select
                 value={
                   (station as StationWithEntreprise & { tm_id?: string | null })
-                    .tm_id || ""
+                    .tm_id || undefined
                 }
                 onValueChange={handleAssignTM}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Assigner un TM">
-                    {(
-                      station as StationWithEntreprise & {
-                        tm_id?: string | null;
-                      }
-                    ).tm_id
-                      ? tms?.find(
-                          (tm) =>
-                            tm.id ===
-                            (
-                              station as StationWithEntreprise & {
-                                tm_id?: string | null;
-                              }
-                            ).tm_id,
-                        )?.nom
-                      : "Aucun TM assigné"}
-                  </SelectValue>
+                  <SelectValue placeholder="Assigner un TM" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">Aucun TM</SelectItem>
@@ -394,6 +417,51 @@ function StationDetailDialog({
                   Retirer le TM
                 </Button>
               )}
+            </div>
+          </section>
+
+          {/* Validation */}
+          <section>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Validation de la station
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={updatingStatus || station.status === "validee"}
+                onClick={() => handleChangeStatus("validee")}
+              >
+                <CheckCircle className="h-4 w-4 mr-1" />
+                Activer
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={updatingStatus || station.status === "suspendue"}
+                onClick={() => handleChangeStatus("suspendue")}
+              >
+                <Pause className="h-4 w-4 mr-1" />
+                Suspendre
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={updatingStatus || station.status === "en_attente"}
+                onClick={() => handleChangeStatus("en_attente")}
+              >
+                <Clock className="h-4 w-4 mr-1" />
+                Mettre en attente
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={updatingStatus || station.status === "rejetee"}
+                onClick={() => handleChangeStatus("rejetee")}
+              >
+                <Ban className="h-4 w-4 mr-1" />
+                Rejeter
+              </Button>
             </div>
           </section>
 

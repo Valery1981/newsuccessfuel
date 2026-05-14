@@ -43,6 +43,7 @@ import {
   MoreHorizontal,
   Plus,
   RefreshCw,
+  Settings,
   UserCheck,
   Users,
   UserX,
@@ -287,6 +288,13 @@ export function ManagerUsersPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => setPermissionsTarget(s)}
+                          >
+                            <Settings className="w-4 h-4 mr-2" />
+                            Configurer droits
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem
                             onClick={() => {
                               setResetTarget(s);

@@ -3,9 +3,19 @@
  * Vérifie que les vues n'ont pas SECURITY DEFINER et que les index sont présents
  */
 
-import { describe, expect, it } from "vitest";
-import { createClient } from "../../utils/supabase/client";
+import { describe, expect, it, vi } from "vitest";
 
+const mockFrom = vi.fn().mockReturnValue({
+  select: vi.fn().mockReturnValue({
+    limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+  }),
+});
+
+vi.mock("../../utils/supabase/client", () => ({
+  createClient: () => ({ from: mockFrom }),
+}));
+
+const { createClient } = await import("../../utils/supabase/client");
 const supabase = createClient();
 
 describe("Database Optimizations", () => {

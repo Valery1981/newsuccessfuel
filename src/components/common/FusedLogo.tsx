@@ -17,14 +17,19 @@ export function FusedLogo({ size = 40 }: { size?: number }) {
         alt="SuccessFuel"
         width={size * 0.5}
         height={size * 0.5}
-        style={{ objectFit: "contain" }}
+        style={{ objectFit: "contain", width: "auto", height: "auto" }}
       />
       <Image
         src="/name.png"
         alt="SuccessFuel"
         width={size * 0.6}
         height={size * 0.4}
-        style={{ objectFit: "contain", marginTop: -2 }}
+        style={{
+          objectFit: "contain",
+          width: "auto",
+          height: "auto",
+          marginTop: -2,
+        }}
       />
     </div>
   );

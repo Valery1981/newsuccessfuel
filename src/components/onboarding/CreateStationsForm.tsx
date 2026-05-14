@@ -35,7 +35,7 @@ const supabase = createClient();
 const stationSchema = z.object({
   nom: z.string().min(2, "Nom minimum 2 caractères").max(255),
   partenaire_id: z.string().optional(),
-  tm_id: z.string().min(1, "TM obligatoire"),
+  tm_id: z.string().optional(),
   adresse: z.string().optional(),
   telephone: z.string().optional(),
 });
@@ -98,7 +98,7 @@ export function CreateStationsForm() {
         ...data,
         entreprise_id: entreprise.id,
         partenaire_id: data.partenaire_id || undefined,
-        tm_id: data.tm_id,
+        tm_id: data.tm_id === "partner_choice" ? null : data.tm_id || undefined,
         status: "en_attente",
         onboarding_step: "cuves",
       });
@@ -142,15 +142,13 @@ export function CreateStationsForm() {
           <div className="space-y-2">
             <Label className="text-slate-200">Partenaire pétrolier</Label>
             <Select
-              value={partenaireId || ""}
+              value={partenaireId || undefined}
               onValueChange={(val: string | null) =>
                 setValue("partenaire_id", val ?? "")
               }
             >
               <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Sélectionner un partenaire (optionnel)">
-                  {(partenaires ?? []).find((p) => p.id === partenaireId)?.nom}
-                </SelectValue>
+                <SelectValue placeholder="Sélectionner un partenaire (optionnel)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="">Aucun partenaire</SelectItem>
@@ -165,20 +163,21 @@ export function CreateStationsForm() {
 
           <div className="space-y-2">
             <Label htmlFor="tm_id" className="text-slate-200">
-              Territory Manager <span className="text-red-400">*</span>
+              {"Territory Manager"}
             </Label>
             <Select
-              value={tmId || ""}
+              value={tmId || undefined}
               onValueChange={(val: string | null) =>
                 setValue("tm_id", val ?? "")
               }
             >
               <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                <SelectValue placeholder="Sélectionner un TM">
-                  {(tms ?? []).find((tm) => tm.id === tmId)?.nom}
-                </SelectValue>
+                <SelectValue placeholder="Sélectionner un TM ou laisser le partenaire choisir" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="partner_choice">
+                  Laisser Partenaire choisir le TM
+                </SelectItem>
                 {(tms ?? []).map((tm) => (
                   <SelectItem key={tm.id} value={tm.id}>
                     {tm.nom}
@@ -220,7 +219,7 @@ export function CreateStationsForm() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => router.push("/company")}
+              onClick={() => router.push("/services")}
               className="flex-1 border-white/20 text-white hover:bg-white/10"
             >
               ← Retour

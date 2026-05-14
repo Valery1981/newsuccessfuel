@@ -200,6 +200,7 @@ export function PartnerUsersPage() {
         body: JSON.stringify({
           ...formData,
           poste: "Territory Manager",
+          role: "tm",
           zone_geo: JSON.stringify(selectedStations),
           droits: selectedDroits,
         }),
@@ -404,14 +405,8 @@ export function PartnerUsersPage() {
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                              >
-                                <MoreHorizontal className="w-4 h-4" />
-                              </Button>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center h-8 w-8 rounded-lg hover:bg-muted">
+                              <MoreHorizontal className="w-4 h-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openEdit(tm)}>

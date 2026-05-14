@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { createClient } from "@/utils/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -13,21 +13,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
   }
 
-  // Verify caller is a gerant
+  // Verify caller is a gerant or partenaire
   const { data: callerCompte } = await supabase
     .from("comptes")
     .select("id, type")
     .eq("supabase_user_id", user.id)
     .maybeSingle();
 
-  if (!callerCompte || callerCompte.type !== "gerant") {
-    return NextResponse.json({ error: "Accès refusé — gérant requis" }, { status: 403 });
+  if (!callerCompte || !["gerant", "partenaire"].includes(callerCompte.type)) {
+    return NextResponse.json(
+      { error: "Accès refusé — gérant ou partenaire requis" },
+      { status: 403 },
+    );
   }
 
-  const body = (await req.json()) as { session_id: string; motDePasseTemp: string };
+  const body = (await req.json()) as {
+    session_id: string;
+    motDePasseTemp: string;
+  };
 
   if (!body.session_id || !body.motDePasseTemp) {
-    return NextResponse.json({ error: "session_id et motDePasseTemp requis" }, { status: 400 });
+    return NextResponse.json(
+      { error: "session_id et motDePasseTemp requis" },
+      { status: 400 },
+    );
   }
 
   // Verify the session belongs to this gerant
@@ -44,9 +53,12 @@ export async function POST(req: NextRequest) {
 
   const admin = createAdminClient();
 
-  const { error: pwError } = await admin.auth.admin.updateUserById(sess.supabase_user_id, {
-    password: body.motDePasseTemp,
-  });
+  const { error: pwError } = await admin.auth.admin.updateUserById(
+    sess.supabase_user_id,
+    {
+      password: body.motDePasseTemp,
+    },
+  );
 
   if (pwError) {
     return NextResponse.json({ error: pwError.message }, { status: 500 });

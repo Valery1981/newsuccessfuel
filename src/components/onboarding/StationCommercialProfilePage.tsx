@@ -119,7 +119,7 @@ export function StationCommercialProfilePage() {
       await stationService.setOnboardingStep(selectedStationId, "complete");
       await queryClient.invalidateQueries({ queryKey: ["stations"] });
       toast.success("Profil commercial enregistré !");
-      router.push("/validation");
+      router.push("/attente");
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Erreur lors de la sauvegarde",

@@ -27,6 +27,11 @@ const STATUS_MAP = {
     color: "bg-red-500/20 text-red-400 border-red-500/30",
     icon: XCircle,
   },
+  rejetee: {
+    label: "Rejetée",
+    color: "bg-gray-500/20 text-gray-400 border-gray-500/30",
+    icon: XCircle,
+  },
 };
 
 export function WaitingValidationPage() {

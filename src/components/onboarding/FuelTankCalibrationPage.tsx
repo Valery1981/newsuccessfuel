@@ -704,7 +704,7 @@ export function FuelTankCalibrationPage() {
       <div className="flex gap-3">
         <Button
           variant="outline"
-          onClick={() => router.push("/station")}
+          onClick={() => router.push("/entreprise")}
           className="flex-1 border-white/20 text-black hover:bg-white/10"
         >
           ← Retour

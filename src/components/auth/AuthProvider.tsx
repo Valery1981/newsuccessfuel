@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from("entreprises")
             .select("id, nom, pays, is_active")
             .eq("compte_id", compte.id)
-            .single();
+            .maybeSingle();
 
           if (entreprise)
             useAuthStore.getState().setEntreprise({
@@ -107,13 +107,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from("comptes")
             .select("id")
             .eq("id", sess.compte_parent_id)
-            .single();
+            .maybeSingle();
           if (parentCompte) {
             const { data: entreprise } = await supabase
               .from("entreprises")
               .select("id, nom, pays, is_active")
               .eq("compte_id", parentCompte.id)
-              .single();
+              .maybeSingle();
             if (entreprise)
               useAuthStore.getState().setEntreprise({
                 ...entreprise,

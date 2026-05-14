@@ -6,7 +6,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "SuccessFuel ERP",
-  description: "Système ERP pour stations-service",
+  description: "Chaque litre compte",
   manifest: "/manifest.json",
   icons: {
     icon: "/favicon.png",

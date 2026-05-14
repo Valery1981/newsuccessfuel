@@ -64,7 +64,7 @@ export function SignupPage() {
         telephone: data.telephone,
       });
       toast.success("Compte créé avec succès ! Vérifiez votre email.");
-      router.push("/company");
+      router.push("/entreprise");
     } catch (error) {
       const msg =
         error instanceof Error ? error.message : "Erreur lors de l'inscription";

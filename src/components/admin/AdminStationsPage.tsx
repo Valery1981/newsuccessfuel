@@ -70,6 +70,10 @@ const STATUS_CONFIG: Record<
     label: "Suspendue",
     className: "bg-red-100 text-red-700 border-red-200",
   },
+  rejetee: {
+    label: "Rejetée",
+    className: "bg-gray-100 text-gray-700 border-gray-200",
+  },
 };
 
 type ConfirmAction = {

@@ -90,11 +90,15 @@ function StatutBadge({ statut }: { statut: StationStatus }) {
       className: "bg-orange-100 text-orange-700 border-orange-200",
     },
     validee: {
-      label: "Validée",
+      label: "Active",
       className: "bg-green-100 text-green-700 border-green-200",
     },
     suspendue: {
       label: "Suspendue",
+      className: "bg-red-100 text-red-700 border-red-200",
+    },
+    rejetee: {
+      label: "Rejetée",
       className: "bg-red-100 text-red-700 border-red-200",
     },
   };
