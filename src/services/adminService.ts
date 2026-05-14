@@ -1,10 +1,11 @@
-import type { Database, DoleanceStatut } from "@/types/supabase";
+import type { Database } from "@/types/supabase";
 import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
 type StationUpdate = Database["public"]["Tables"]["stations"]["Update"];
 type StationStatus = Database["public"]["Enums"]["station_status"];
+type DoleanceStatut = Database["public"]["Enums"]["doleance_statut"];
 type DoleanceTypeIncident =
   Database["public"]["Tables"]["doleances"]["Row"]["type_incident"];
 type PartenaireType = Database["public"]["Enums"]["partenaire_type"];
