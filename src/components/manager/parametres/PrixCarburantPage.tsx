@@ -195,7 +195,7 @@ export function PrixCarburantPage() {
                     <SelectContent>
                       <SelectItem value="essence">Essence</SelectItem>
                       <SelectItem value="gasoil">Gasoil</SelectItem>
-                      <SelectItem value="gpl">GPL</SelectItem>
+                      <SelectItem value="petrole">Petrole</SelectItem>
                     </SelectContent>
                   </Select>
                   {errors.type_carburant && (

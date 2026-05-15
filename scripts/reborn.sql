@@ -337,7 +337,7 @@ CREATE TABLE prix_carburant (
   type_carburant VARCHAR(50) NOT NULL,
   prix_vente DECIMAL(10, 4) NOT NULL CHECK (prix_vente > 0),
   marge_litre DECIMAL(10, 4) NOT NULL CHECK (marge_litre >= 0),
-  prix_achat DECIMAL(10, 4) GENERATED ALWAYS AS (prix_vente - marge_litre) STORED,
+  prix_achat DECIMAL(10, 4),
   date_effet DATE NOT NULL DEFAULT CURRENT_DATE,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(station_id, type_carburant, date_effet)
@@ -1118,6 +1118,18 @@ $$ LANGUAGE plpgsql STABLE;
 -- ============================================================
 -- 23. TRIGGERS
 -- ============================================================
+
+-- Calcul automatique prix_achat = prix_vente - marge_litre
+CREATE OR REPLACE FUNCTION fn_compute_prix_achat() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.prix_achat = NEW.prix_vente - NEW.marge_litre;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trig_compute_prix_achat
+BEFORE INSERT OR UPDATE ON prix_carburant
+FOR EACH ROW EXECUTE FUNCTION fn_compute_prix_achat();
 
 -- Mise à jour totaux écriture comptable
 CREATE OR REPLACE FUNCTION fn_update_ecriture_totaux() RETURNS TRIGGER AS $$
