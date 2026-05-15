@@ -52,6 +52,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+// APEX 2026-05-15-03 : validation extraite (testable)
+import type { CalibrationPoint } from "@/lib/calibrageValidation";
+import { validateCalibrationPoints } from "@/lib/calibrageValidation";
 import { cuveService } from "@/services/cuveService";
 import { stationService } from "@/services/stationService";
 import { useAuthStore } from "@/stores/authStore";
@@ -65,13 +68,7 @@ const FUEL_TYPES = [
   { value: "Petrole", label: "Pétrole lampant", compte: "330" as const },
 ] as const;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface CalibrationPoint {
-  hauteur_cm: number;
-  volume_litres: number;
-  erreur?: string | null;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────────
 
 interface CuveDB {
   id: string;
@@ -79,53 +76,6 @@ interface CuveDB {
   type_carburant: string;
   capacite_max: number | null;
   calibrages: { hauteur_cm: number; volume_litres: number }[];
-}
-
-// ─── Validation rules (Guide §7) ──────────────────────────────────────────────
-
-function validateCalibrationPoints(
-  points: CalibrationPoint[],
-  capaciteMax: number | null,
-): CalibrationPoint[] {
-  const withErrors = points.map((pt, i) => {
-    if (pt.hauteur_cm < 1)
-      return {
-        ...pt,
-        erreur: `Hauteur ${pt.hauteur_cm} cm invalide — minimum 1 cm (ligne ${i + 1})`,
-      };
-    if (i === 0) return { ...pt, erreur: null };
-    const prev = points[i - 1];
-    if (pt.hauteur_cm === prev.hauteur_cm)
-      return {
-        ...pt,
-        erreur: `Hauteur ${pt.hauteur_cm} cm dupliquée (ligne ${i + 1})`,
-      };
-    if (pt.hauteur_cm < prev.hauteur_cm)
-      return {
-        ...pt,
-        erreur: `Hauteur ${pt.hauteur_cm} cm < ${prev.hauteur_cm} cm (ligne ${i + 1}) — doit être strictement supérieure`,
-      };
-    if (pt.volume_litres === prev.volume_litres)
-      return {
-        ...pt,
-        erreur: `Volume ${pt.volume_litres} L dupliqué (ligne ${i + 1})`,
-      };
-    if (pt.volume_litres <= prev.volume_litres)
-      return {
-        ...pt,
-        erreur: `Volume ${pt.volume_litres} L ≤ ${prev.volume_litres} L (ligne ${i + 1}) — doit être strictement supérieur`,
-      };
-    return { ...pt, erreur: null };
-  });
-
-  return withErrors.map((pt, i, arr) => {
-    if (i === arr.length - 1 && capaciteMax && pt.volume_litres < capaciteMax)
-      return {
-        ...pt,
-        erreur: `Dernier volume (${pt.volume_litres} L) < capacité max (${capaciteMax} L) — Règle 1`,
-      };
-    return pt;
-  });
 }
 
 // ─── Interval inference ──────────────────────────────────────────────────────

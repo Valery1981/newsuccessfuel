@@ -446,3 +446,20 @@ Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-co
 
 - Exemple #2 (layout 2 colonnes Initialisation)
 - Exemple #3 (Volume Cuves auto-calculé via calibrages)
+
+---
+
+### ACTION #014 — APEX 2026-05-15-03 : Calibrage 3 règles strictes
+
+**Date** : 2026-05-15
+**Statut** : TERMINÉ
+
+**Objectif** : extraire et tester la validation des 3 règles strictes de calibrage cuves (Guide §7 sous-étape 3.2 + §14 règle 17/18).
+
+**Réalisations** :
+
+- `src/lib/calibrageValidation.ts` créé : `validateCalibrationPoints()` + `isCalibrationValid()` (fonctions pures, testables)
+- `src/lib/__tests__/calibrageValidation.test.ts` : **10 tests unitaires** couvrant les 3 règles (Règle 1 dernière jauge ≥ capacité, Règle 2 monotone, Règle 3 doublons)
+- `FuelTankCalibrationPage.tsx` : import depuis le module extrait, suppression de la fonction inline (DRY)
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 153 passants (143 → 153, +10) / Build vert.
