@@ -53,14 +53,13 @@ export const prixCarburantService = {
    * PA = PV − Marge (calculé automatiquement, jamais saisi — §6.5).
    */
   async create(input: CreatePrixCarburantInput): Promise<PrixCarburantRow> {
-    const prix_achat = input.prix_vente - input.marge_litre;
+    // prix_achat est GENERATED ALWAYS AS (prix_vente - marge_litre) STORED — ne pas l'insérer
     const payload: Database["public"]["Tables"]["prix_carburant"]["Insert"] = {
       station_id: input.station_id,
       type_carburant: input.type_carburant,
       prix_vente: input.prix_vente,
       marge_litre: input.marge_litre,
-      prix_achat,
-      date_effet: input.date_effet ?? new Date().toISOString(),
+      date_effet: input.date_effet ?? new Date().toISOString().split("T")[0],
     };
     const { data, error } = await supabase
       .from("prix_carburant")
