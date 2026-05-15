@@ -79,13 +79,8 @@ const navSections: NavSection[] = [
             icon: Package,
           },
           {
-            href: "/manager/parametres/carburants",
-            label: "Carburants",
-            icon: Fuel,
-          },
-          {
             href: "/manager/parametres/prix-carburant",
-            label: "Prix Carburant",
+            label: "Carburants",
             icon: Fuel,
           },
           {
@@ -627,7 +622,7 @@ function TopBar({
     if (pathname.includes("/parametres/comptes")) return "Plan comptable";
     if (pathname.includes("/parametres/tiers")) return "Tiers";
     if (pathname.includes("/parametres/articles")) return "Articles / Produits";
-    if (pathname.includes("/parametres/carburants")) return "Carburants";
+    if (pathname.includes("/parametres/prix-carburant")) return "Carburants";
     if (pathname.includes("/parametres/tresorerie")) return "Trésorerie";
     if (pathname.includes("/parametres/camions")) return "Camions";
     if (pathname.includes("/parametres/services")) return "Services";
