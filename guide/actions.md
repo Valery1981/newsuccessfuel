@@ -322,3 +322,64 @@
 - TRUNCATE + INSERT complet de 70 comptes
 - Vue capitaux propres mise à jour (120 au lieu de 12)
 - Plan validé compte par compte avec le directeur projet
+
+
+---
+
+## 2026-05-15
+
+### ACTION #010 — Audit complet src/ ↔ Guide & création des 10 APEX 2026-05-15
+
+**Statut** : 🔄 EN COURS — APEX créés, exécution à planifier
+
+**Contexte** : Demande utilisateur (DEMANDE #006) suite à constat de désalignement entre `src/` et `guide/Guide_Document_SuccessFuel.md`. Exemples cités : Plan Comptable n'affiche pas les tiers, Initialisation pas en 2 colonnes, Volume Cuves saisi manuellement.
+
+**Audit réalisé** :
+
+- Comparaison exhaustive `src/app`, `src/components`, `src/services`, `src/lib`, `src/hooks`, `src/stores` vs Guide §1-§18
+- Analyse de DIFF.md (modifications client postérieures au Guide)
+- Vérification des règles métier critiques (Guide §14)
+
+**Écarts identifiés** :
+
+1. 🔴 `StructureComptesPage` n'agrège pas les tiers/trésoreries/articles auto-générés (Guide §8.1 lignes 328-333)
+2. 🔴 `CompanyInitialisationPage` layout single column (Guide §9 — 2 colonnes attendues)
+3. 🔴 Onglet Cuves Initialisation : Volume saisi manuellement (Guide §10.2 ligne 418 — doit être calculé via calibrages)
+4. 🟠 `noperations/` : 8 sous-dossiers vides, VirementInterne absent
+5. 🟠 DIFF.md non intégré au dashboard partenaire (KPIs MTD, projections, TM filter, badge MAJ, retrait CA boutique)
+6. 🟠 `useRealtimeStock` viole la règle "Realtime = doléances uniquement" (Guide §14 #14)
+7. 🟠 `hasPermission()` non appliqué uniformément sur les boutons sensibles
+8. 🔴 Conformité DB du plan comptable (6031-6037, 7071-7077, 460, 651/652/751/752) à vérifier
+9. 🟡 Tests E2E couverture incomplète (manque onboarding, shifts, POS, rapports, partenaire)
+10. 🟡 Pas de configuration Vercel ni `vercel.json`
+
+**Livrables produits** :
+
+- `.claude/commands/apex-2026-05-15-00-master-plan.md`
+- `.claude/commands/apex-2026-05-15-01-plan-comptable-aggrege.md`
+- `.claude/commands/apex-2026-05-15-02-initialisation-layout-volume-auto.md`
+- `.claude/commands/apex-2026-05-15-03-calibrage-3-regles-strictes.md`
+- `.claude/commands/apex-2026-05-15-04-noperations-architecture.md`
+- `.claude/commands/apex-2026-05-15-05-realtime-doleances-uniquement.md`
+- `.claude/commands/apex-2026-05-15-06-partner-dashboard-diff.md`
+- `.claude/commands/apex-2026-05-15-07-permissions-boutons-sensibles.md`
+- `.claude/commands/apex-2026-05-15-08-plan-comptable-db-conformite.md`
+- `.claude/commands/apex-2026-05-15-09-tests-e2e-coverage.md`
+- `.claude/commands/apex-2026-05-15-10-deploiement-vercel.md`
+- `guide/demandes.md` : DEMANDE #006 ajoutée
+- `guide/actions.md` : ACTION #010 (cette entrée)
+
+**Plan d'exécution** :
+
+- Sprint 1 — Conformité métier critique : APEX 01 + 08 + 02 + 03
+- Sprint 2 — Architecture & permissions : APEX 04 + 07 + 05
+- Sprint 3 — Partenaire & tests : APEX 06 + 09
+- Sprint 4 — Production : APEX 10
+
+**Prochaines étapes** :
+
+- Validation utilisateur du plan
+- Exécution APEX 01 (Plan Comptable agrégé) → résout l'exemple #1
+- Exécution APEX 02 (Initialisation 2 colonnes + volume auto) → résout les exemples #2 et #3
+- Pour chaque APEX : tests Vitest + Playwright + lint + tsc + build + commit + push (CLAUDE.md non négociable)
+

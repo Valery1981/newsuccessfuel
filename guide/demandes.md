@@ -141,3 +141,49 @@ Actions documentées :
 
 - guide/actions.md : ACTION #009 ajoutée avec détails complets
 - guide/demandes.md : cette entrée
+
+---
+
+DEMANDE #006 — Audit complet src/ ↔ Guide_Document_SuccessFuel.md & création des APEX 2026-05-15
+Date : 2026-05-15
+Statut : 🔄 EN COURS (APEX créés, exécution à valider)
+
+Description :
+Audit demandé suite à constat que plusieurs règles du Guide ne sont pas alignées avec l'implémentation `src/`. 3 exemples explicites :
+
+1. Plan Comptable (`src/app/(manager)/manager/parametres/comptes`) — fournisseurs/clients créés non affichés alors que le Guide §8.1 lignes 328-333 impose : "Classes 3, 4, 5 : auto-générés à la création des tiers/articles/trésoreries".
+2. Initialisation (`src/components/manager/initialisation/CompanyInitialisationPage.tsx`) — layout single column ; doit être 2 colonnes (gauche = Synthèse lignes 946-1033, droite = Tabs lignes 494-943).
+3. Onglet Cuves Initialisation — Volume saisi manuellement, alors que Guide §10.2 ligne 418 impose "Jauge (cm) → Volume (litres) calculé via calibrages → Valorisation auto".
+
+Demande utilisateur :
+
+- Aligner strictement l'application sur le Guide
+- Diviser le travail en APEX nommés avec la date du jour (2026-05-15)
+- Générer un plan d'intégration global
+- Documenter dans `guide/actions.md` et `guide/demandes.md`
+- Suivre CLAUDE.md (tests unit + e2e + lint + tsc + build avant git add/commit/push)
+
+Livrables produits (cette session) :
+
+- `.claude/commands/apex-2026-05-15-00-master-plan.md`
+- `.claude/commands/apex-2026-05-15-01-plan-comptable-aggrege.md` 🔴 (résout exemple #1)
+- `.claude/commands/apex-2026-05-15-02-initialisation-layout-volume-auto.md` 🔴 (résout exemples #2 et #3)
+- `.claude/commands/apex-2026-05-15-03-calibrage-3-regles-strictes.md` 🟠
+- `.claude/commands/apex-2026-05-15-04-noperations-architecture.md` 🟠 (VirementInterne manquant)
+- `.claude/commands/apex-2026-05-15-05-realtime-doleances-uniquement.md` 🟡
+- `.claude/commands/apex-2026-05-15-06-partner-dashboard-diff.md` 🟠 (DIFF.md non intégré)
+- `.claude/commands/apex-2026-05-15-07-permissions-boutons-sensibles.md` 🟠
+- `.claude/commands/apex-2026-05-15-08-plan-comptable-db-conformite.md` 🔴
+- `.claude/commands/apex-2026-05-15-09-tests-e2e-coverage.md` 🟡
+- `.claude/commands/apex-2026-05-15-10-deploiement-vercel.md` 🟡
+- `.claude/commands/apex-2026-05-15-11-convergence-finale.md` 🔴 (boucle d'audit récursive ajoutée à la demande de l'utilisateur)
+
+Sprints proposés :
+
+- Sprint 1 (conformité métier critique) : APEX 01, 08, 02, 03
+- Sprint 2 (architecture & permissions) : APEX 04, 07, 05
+- Sprint 3 (partenaire & tests) : APEX 06, 09
+- Sprint 4 (production) : APEX 10
+- Sprint 5 (convergence finale) : APEX 11 — boucle d'audit récursive jusqu'à alignement total avec le Guide ; STOP quand rapport d'écarts vide ; max 5 itérations par session
+
+Statut : à valider par l'utilisateur, puis exécution séquentielle.
