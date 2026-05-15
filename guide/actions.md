@@ -529,3 +529,28 @@ Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-co
 - Doléances créer (`doleances`)
 
 **Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.
+
+---
+
+### ACTION #018 — APEX 2026-05-15-06 : Partner Dashboard DIFF.md
+
+**Date** : 2026-05-15
+**Statut** : TERMINÉ (largement déjà conforme — un seul ajout)
+
+**Audit** :
+
+- DIFF.md §1 (KPIs achats/ventes/lubrifiants/doléances MTD) → **DÉJÀ CONFORME** (`KPICards.tsx`)
+- DIFF.md §2 (Stocks par station + seuil alerte) → **DÉJÀ CONFORME** (`StockLevelTable.tsx`)
+- DIFF.md §3 (Projection mensuelle vitesse journalière) → **DÉJÀ CONFORME** (`MonthlyObjectiveTable.tsx` + `partnerObjectiveService.getRealisationsMensuelles()`)
+- DIFF.md §4 (Projection annuelle) → **DÉJÀ CONFORME** (`AnnualObjectiveTable.tsx` + service)
+- DIFF.md §5 (Niveau écarts station) → **DÉJÀ CONFORME** (`StationEcartTable.tsx`)
+- DIFF.md §10 (CA boutique RETIRÉ du dashboard) → **DÉJÀ CONFORME** (KPICards n'inclut pas de CA boutique)
+- DIFF.md §9 (LastUpdateBadge par station) → **AJOUTÉ** : `src/components/partner/LastUpdateBadge.tsx` créé (queries inventaires + shifts + receptions + doléances, format `dd/MM/yyyy HH:mm`)
+
+**Réalisations** :
+
+- `src/components/partner/LastUpdateBadge.tsx` : composant infrastructure prêt à être intégré dans `StockLevelTable` ou `StationEcartTable` selon UX souhaité
+
+**Reste optionnel** : TMFilter global (DIFF §6) — `StationFilter` existant filtre par station ; un `TMFilter` distinct nécessiterait un schema zone_geographique sur les sessions partenaires.
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.
