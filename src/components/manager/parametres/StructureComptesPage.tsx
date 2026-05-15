@@ -45,7 +45,16 @@ import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
-interface CompteStandard {
+// APEX 2026-05-15-01 : lecture via vue_plan_comptable_complet
+// Source agrégée : plan_comptable_standard + plan_comptable_entreprise + tiers (401/411/421/460) + tresoreries (512/513/514/530)
+type CompteSource =
+  | "standard"
+  | "entreprise"
+  | "tiers"
+  | "tiers_460"
+  | "tresorerie";
+
+interface CompteRow {
   id: string;
   numero: string;
   libelle: string;
@@ -53,28 +62,19 @@ interface CompteStandard {
   is_centralisateur: boolean;
   numero_parent: string | null;
   is_modifiable: boolean;
-}
-
-interface CompteEntreprise {
-  id: string;
+  source: CompteSource;
   entreprise_id: string | null;
-  numero: string;
-  numero_parent: string;
-  libelle: string;
-  classe: number;
-  is_centralisateur: boolean;
-  is_active: boolean;
 }
 
 interface CompteNode {
-  type: "standard" | "entreprise";
+  source: CompteSource;
   id: string;
   numero: string;
   libelle: string;
   is_centralisateur: boolean;
   numero_parent: string | null;
   classe: number;
-  is_modifiable?: boolean;
+  is_modifiable: boolean;
   sousComptes: CompteNode[];
 }
 
@@ -96,15 +96,23 @@ const sousCompteSchema = z.object({
 
 type SousCompteFormData = z.infer<typeof sousCompteSchema>;
 
-function buildTree(
-  standards: CompteStandard[],
-  entreprise: CompteEntreprise[],
-): CompteNode[] {
-  const nodesById = new Map<string, CompteNode>();
+function buildTree(rows: CompteRow[]): CompteNode[] {
+  // Index par numero pour lookups parent/enfant. En cas de doublon (très rare),
+  // on privilégie la source 'entreprise' > 'standard' > tiers/trésorerie.
+  const priority: Record<CompteSource, number> = {
+    entreprise: 4,
+    standard: 3,
+    tiers: 2,
+    tiers_460: 2,
+    tresorerie: 2,
+  };
+  const nodesByNumero = new Map<string, CompteNode>();
 
-  for (const c of standards) {
-    nodesById.set(c.numero, {
-      type: "standard",
+  for (const c of rows) {
+    const existing = nodesByNumero.get(c.numero);
+    if (existing && priority[existing.source] >= priority[c.source]) continue;
+    nodesByNumero.set(c.numero, {
+      source: c.source,
       id: c.id,
       numero: c.numero,
       libelle: c.libelle,
@@ -116,32 +124,17 @@ function buildTree(
     });
   }
 
-  for (const c of entreprise) {
-    if (!c.is_active) continue;
-    nodesById.set(c.numero, {
-      type: "entreprise",
-      id: c.id,
-      numero: c.numero,
-      libelle: c.libelle,
-      is_centralisateur: c.is_centralisateur,
-      numero_parent: c.numero_parent,
-      classe: c.classe,
-      is_modifiable: true,
-      sousComptes: [],
-    });
-  }
-
   const roots: CompteNode[] = [];
 
-  for (const node of nodesById.values()) {
-    if (node.numero_parent && nodesById.has(node.numero_parent)) {
-      nodesById.get(node.numero_parent)!.sousComptes.push(node);
+  for (const node of nodesByNumero.values()) {
+    if (node.numero_parent && nodesByNumero.has(node.numero_parent)) {
+      nodesByNumero.get(node.numero_parent)!.sousComptes.push(node);
     } else {
       roots.push(node);
     }
   }
 
-  for (const node of nodesById.values()) {
+  for (const node of nodesByNumero.values()) {
     node.sousComptes.sort((a, b) => a.numero.localeCompare(b.numero));
   }
   roots.sort((a, b) => a.numero.localeCompare(b.numero));
@@ -196,12 +189,27 @@ function CompteRow({
               Centralisateur
             </Badge>
           )}
-          {node.type === "entreprise" && (
+          {node.source === "entreprise" && (
             <Badge variant="secondary" className="text-xs py-0 h-5">
               Personnalisé
             </Badge>
           )}
-          {canEdit && (
+          {node.source === "tiers" && (
+            <Badge variant="secondary" className="text-xs py-0 h-5">
+              Tiers
+            </Badge>
+          )}
+          {node.source === "tiers_460" && (
+            <Badge variant="outline" className="text-xs py-0 h-5">
+              Resp. opérationnelle
+            </Badge>
+          )}
+          {node.source === "tresorerie" && (
+            <Badge variant="secondary" className="text-xs py-0 h-5">
+              Trésorerie
+            </Badge>
+          )}
+          {canEdit && node.is_modifiable && (
             <Button
               variant="ghost"
               size="sm"
@@ -213,7 +221,7 @@ function CompteRow({
             </Button>
           )}
           {onDelete &&
-            node.type === "entreprise" &&
+            node.source === "entreprise" &&
             node.sousComptes.length === 0 && (
               <Button
                 variant="ghost"
@@ -250,31 +258,22 @@ export function StructureComptesPage() {
   const [dialogParent, setDialogParent] = useState<CompteNode | null>(null);
   const [deletingNode, setDeletingNode] = useState<CompteNode | null>(null);
 
-  const { data: standards, isLoading: stdLoading } = useQuery({
-    queryKey: ["plan-comptable-standard"],
+  // APEX 2026-05-15-01 : lecture unique via vue agrégée (filtre RLS hérite des tables sources)
+  const { data: comptes, isLoading: comptesLoading } = useQuery({
+    queryKey: ["plan-comptable-complet", entreprise?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("plan_comptable_standard")
+      const query = supabase
+        .from("vue_plan_comptable_complet")
         .select("*")
         .order("numero");
+      // Filtrer : standard (entreprise_id null) OR entreprise courante
+      const filter = entreprise?.id
+        ? query.or(`entreprise_id.is.null,entreprise_id.eq.${entreprise.id}`)
+        : query.is("entreprise_id", null);
+      const { data, error } = await filter;
       if (error) throw error;
-      return (data ?? []) as CompteStandard[];
+      return (data ?? []) as unknown as CompteRow[];
     },
-  });
-
-  const { data: entrepriseComptes, isLoading: entLoading } = useQuery({
-    queryKey: ["plan-comptable-entreprise", entreprise?.id],
-    queryFn: async () => {
-      if (!entreprise) return [];
-      const { data, error } = await supabase
-        .from("plan_comptable_entreprise")
-        .select("*")
-        .eq("entreprise_id", entreprise.id)
-        .order("numero");
-      if (error) throw error;
-      return (data ?? []) as CompteEntreprise[];
-    },
-    enabled: !!entreprise?.id,
   });
 
   const form = useForm<SousCompteFormData>({
@@ -312,7 +311,7 @@ export function StructureComptesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["plan-comptable-entreprise"],
+        queryKey: ["plan-comptable-complet"],
       });
       toast.success("Sous-compte ajouté avec succès");
       form.reset();
@@ -337,7 +336,7 @@ export function StructureComptesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["plan-comptable-entreprise"],
+        queryKey: ["plan-comptable-complet"],
       });
       toast.success("Sous-compte supprimé");
       setDeletingNode(null);
@@ -348,10 +347,9 @@ export function StructureComptesPage() {
     },
   });
 
-  if (stdLoading || entLoading) return <PageLoading />;
+  if (comptesLoading) return <PageLoading />;
 
-  const allStandards = standards ?? [];
-  const allEntreprise = entrepriseComptes ?? [];
+  const allComptes = comptes ?? [];
 
   const classeNumbers = [1, 2, 3, 4, 5, 6, 7];
 
@@ -437,9 +435,8 @@ export function StructureComptesPage() {
 
         {classeNumbers.map((n) => {
           const canEdit = EDITABLE_CLASSES.includes(n);
-          const classeStandards = allStandards.filter((c) => c.classe === n);
-          const classeEntreprise = allEntreprise.filter((c) => c.classe === n);
-          const tree = buildTree(classeStandards, classeEntreprise);
+          const classeRows = allComptes.filter((c) => c.classe === n);
+          const tree = buildTree(classeRows);
 
           return (
             <TabsContent key={n} value={String(n)} className="mt-4">

@@ -3720,6 +3720,20 @@ export type Database = {
       };
     };
     Views: {
+      vue_plan_comptable_complet: {
+        Row: {
+          id: string | null;
+          numero: string | null;
+          libelle: string | null;
+          classe: number | null;
+          is_centralisateur: boolean | null;
+          numero_parent: string | null;
+          is_modifiable: boolean | null;
+          source: string | null;
+          entreprise_id: string | null;
+        };
+        Relationships: [];
+      };
       mv_ca_mensuel: {
         Row: {
           ca_boutique: number | null;

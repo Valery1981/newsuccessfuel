@@ -323,7 +323,6 @@
 - Vue capitaux propres mise à jour (120 au lieu de 12)
 - Plan validé compte par compte avec le directeur projet
 
-
 ---
 
 ## 2026-05-15
@@ -383,3 +382,21 @@
 - Exécution APEX 02 (Initialisation 2 colonnes + volume auto) → résout les exemples #2 et #3
 - Pour chaque APEX : tests Vitest + Playwright + lint + tsc + build + commit + push (CLAUDE.md non négociable)
 
+---
+
+### ACTION #011 — APEX 2026-05-15-01 : Plan Comptable agrégé ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ
+
+**Objectif** : afficher dans `/manager/parametres/comptes` les fournisseurs/clients/employés/trésoreries auto-générés (Guide §8.1 lignes 328-333).
+
+**Réalisations** :
+
+- Migration SQL `create_vue_plan_comptable_complet` : vue `vue_plan_comptable_complet` (SECURITY INVOKER) qui agrège plan_comptable_standard + plan_comptable_entreprise + tiers (401/411/421 + 460 employés) + tresoreries (512/513/514/530)
+- Frontend `src/components/manager/parametres/StructureComptesPage.tsx` : query unique sur la vue, badges par source (Tiers / Trésorerie / Resp. opérationnelle / Personnalisé)
+- Types `src/types/supabase.ts` : ajout type Row pour `vue_plan_comptable_complet`
+
+**Vérification DB** : 9 trésoreries + 3 tiers visibles dans la vue.
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 143 passants / Build vert.
