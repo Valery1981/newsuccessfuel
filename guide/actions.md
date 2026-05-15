@@ -554,3 +554,66 @@ Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-co
 **Reste optionnel** : TMFilter global (DIFF §6) — `StationFilter` existant filtre par station ; un `TMFilter` distinct nécessiterait un schema zone_geographique sur les sessions partenaires.
 
 **Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.
+
+---
+
+### ACTION #019 — APEX 2026-05-15-10 : Déploiement Vercel ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ (config minimale prête)
+
+**Réalisations** :
+
+- `vercel.json` créé : framework Next.js, région `cdg1` (Paris), headers cache pour `sw.js` et `manifest.json` (PWA)
+- `.env.example` déjà présent (Supabase + credentials de test)
+
+**Reste à faire (manuel par l'utilisateur)** :
+
+- Importer le dépôt GitHub dans Vercel
+- Configurer les secrets : `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- Premier déploiement preview puis production
+
+---
+
+### ACTION #020 — APEX 2026-05-15-11 : Convergence finale ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ CONVERGENCE ATTEINTE — itération 1
+
+**Méthode** : audit exhaustif `src/` ↔ Guide §1-§18 + 20 règles + DIFF.md
+
+**Rapport** : `guide/apex/CONVERGENCE_REPORT_2026-05-15_iter1.md`
+
+**Synthèse** :
+
+- ✅ 50+ items du Guide vérifiés conformes
+- ✅ Les 3 exemples explicitement remontés par l'utilisateur → résolus
+- ✅ Tous les écarts 🔴 et 🟠 → résolus ou audités OK
+- ⚠️ 4 écarts 🟡 résiduels documentés (E2E coverage, PermissionGate à appliquer à 5 pages, TMFilter, refactor noperations/) — reportés explicitement, non bloquants
+
+**Tag** : `convergence-2026-05-15-iter1-ok`
+
+**Sortie de boucle** : aucun écart critique restant → STOP itérations.
+
+---
+
+## RÉCAPITULATIF DU SPRINT 2026-05-15
+
+| APEX | Sujet                                            | Statut     | Commits    |
+| ---- | ------------------------------------------------ | ---------- | ---------- |
+| 00   | Master plan                                      | ✅ doc     | fdc7286    |
+| 01   | Plan Comptable agrégé (vue SQL)                  | ✅         | 5cd3b28    |
+| 02   | Initialisation 2 colonnes + volume auto          | ✅         | 0897ea7    |
+| 03   | Calibrage 3 règles strictes                      | ✅         | da24d98    |
+| 04   | Noperations (audit NOOP)                         | ✅         | 21648dd    |
+| 05   | Realtime doléances uniquement                    | ✅         | b42cc54    |
+| 06   | Partner dashboard DIFF.md                        | ✅         | acb79c7    |
+| 07   | PermissionGate + boutons sensibles (premier lot) | ✅         | 21648dd    |
+| 08   | Plan Comptable DB conformité (déjà OK)           | ✅         | 0897ea7    |
+| 09   | Tests E2E coverage                               | ⏸️ reporté | —          |
+| 10   | Déploiement Vercel                               | ✅         | (en cours) |
+| 11   | Convergence finale                               | ✅         | (en cours) |
+
+**11 / 11 APEX traités** (10 ✅ + 1 reporté explicitement).
+
+**Qualité finale** : ESLint 0 / TypeScript 0 / Vitest 153 passants (143 → 153) / Build vert.
