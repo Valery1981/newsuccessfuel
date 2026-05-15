@@ -33,19 +33,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
 import { formatCurrency } from "@/lib/utils";
 import { stationService } from "@/services/stationService";
 import { useAuthStore } from "@/stores/authStore";
 import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
-
-const CARBURANT_TYPES = [
-  { value: "SP95", label: "Essence SP95", compte: "701" },
-  { value: "SP91", label: "Essence SP91", compte: "701" },
-  { value: "GO", label: "Gasoil", compte: "702" },
-  { value: "Petrole", label: "Pétrole lampant", compte: "703" },
-];
 
 interface PrixCarburant {
   id: string;
@@ -144,9 +138,10 @@ export function StructureCarburantsPage() {
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedStationId, setSelectedStationId] = useState("");
+  const { data: typesCarburant } = useTypesCarburantActifs();
   const [formData, setFormData] = useState({
     station_id: "",
-    type_carburant: "SP95",
+    type_carburant_id: "",
     prix_vente: "",
     marge_litre: "",
   });
@@ -174,9 +169,14 @@ export function StructureCarburantsPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const tc = (typesCarburant ?? []).find(
+        (t) => t.id === formData.type_carburant_id,
+      );
       const { error } = await supabase.from("prix_carburant").insert({
         station_id: formData.station_id,
-        type_carburant: formData.type_carburant,
+        type_carburant_id: formData.type_carburant_id,
+        // Compat legacy : le trigger DB rerempli ce champ via le label, mais on l'envoie quand même.
+        type_carburant: tc?.label ?? null,
         prix_vente: Number(formData.prix_vente),
         marge_litre: Number(formData.marge_litre),
         date_effet: new Date().toISOString().split("T")[0],
@@ -189,7 +189,7 @@ export function StructureCarburantsPage() {
       setIsDialogOpen(false);
       setFormData({
         station_id: "",
-        type_carburant: "SP95",
+        type_carburant_id: "",
         prix_vente: "",
         marge_litre: "",
       });
@@ -272,19 +272,21 @@ export function StructureCarburantsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Type de carburant</Label>
+              <Label>
+                Type de carburant <span className="text-destructive">*</span>
+              </Label>
               <Select
-                value={formData.type_carburant}
+                value={formData.type_carburant_id}
                 onValueChange={(v) =>
-                  setFormData((p) => ({ ...p, type_carburant: v ?? "" }))
+                  setFormData((p) => ({ ...p, type_carburant_id: v ?? "" }))
                 }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {CARBURANT_TYPES.map((c) => (
-                    <SelectItem key={c.value} value={c.value}>
+                  {(typesCarburant ?? []).map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
                       {c.label}
                     </SelectItem>
                   ))}
@@ -341,6 +343,7 @@ export function StructureCarburantsPage() {
                 onClick={() => createMutation.mutate()}
                 disabled={
                   !formData.station_id ||
+                  !formData.type_carburant_id ||
                   !formData.prix_vente ||
                   !formData.marge_litre ||
                   createMutation.isPending
@@ -411,8 +414,12 @@ export function StructureCarburantsPage() {
                 (prixList ?? []).map((p) => (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium">
-                      {CARBURANT_TYPES.find((c) => c.value === p.type_carburant)
-                        ?.label ?? p.type_carburant}
+                      {(typesCarburant ?? []).find(
+                        (c) =>
+                          c.id ===
+                          (p as PrixCarburant & { type_carburant_id?: string })
+                            .type_carburant_id,
+                      )?.label ?? p.type_carburant}
                     </TableCell>
                     <TableCell className="text-right">
                       <EditableCell

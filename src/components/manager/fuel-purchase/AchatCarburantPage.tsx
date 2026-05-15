@@ -26,6 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
 import { buildBLPrintHtml, openPrintWindow } from "@/lib/printUtils";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { stationService } from "@/services/stationService";
@@ -66,14 +67,6 @@ interface AchatCarburant {
   fournisseur_nom?: string;
 }
 
-const PRODUITS_CARBURANT = [
-  { value: "essence", label: "Essence", compte: "310" },
-  { value: "gasoil", label: "Gasoil", compte: "320" },
-  { value: "petrole", label: "Pétrole lampant", compte: "330" },
-] as const;
-
-type ProduitCarburant = (typeof PRODUITS_CARBURANT)[number]["value"];
-
 export function AchatCarburantPage() {
   const { entreprise, compte } = useAuthStore();
   const queryClient = useQueryClient();
@@ -87,10 +80,19 @@ export function AchatCarburantPage() {
     useState<string>("");
 
   // Lignes BC
-  const [lignesBC, setLignesBC] = useState([
+  const { data: typesCarburant } = useTypesCarburantActifs();
+
+  const [lignesBC, setLignesBC] = useState<
+    Array<{
+      station_id: string;
+      produit: string;
+      quantite_commandee: string;
+      prix_unitaire: string;
+    }>
+  >([
     {
       station_id: "",
-      produit: "essence" as ProduitCarburant,
+      produit: "",
       quantite_commandee: "",
       prix_unitaire: "",
     },
@@ -225,12 +227,17 @@ export function AchatCarburantPage() {
 
       // Lignes BC (table réelle : lignes_bc_carburant)
       const lignesInsert: import("@/types/supabase").Database["public"]["Tables"]["lignes_bc_carburant"]["Insert"][] =
-        lignesValides.map((l) => ({
-          achat_id: achat.id,
-          station_id: l.station_id || null,
-          type_carburant: l.produit,
-          quantite_commandee: Number(l.quantite_commandee),
-        }));
+        lignesValides.map((l) => {
+          const tc = (typesCarburant ?? []).find((t) => t.id === l.produit);
+          return {
+            achat_id: achat.id,
+            station_id: l.station_id || null,
+            type_carburant_id: l.produit,
+            // Compat legacy : libellé string alimenté via label, trigger DB synchronise.
+            type_carburant: tc?.label ?? l.produit,
+            quantite_commandee: Number(l.quantite_commandee),
+          };
+        });
       await supabase.from("lignes_bc_carburant").insert(lignesInsert);
 
       return achat;
@@ -575,7 +582,7 @@ export function AchatCarburantPage() {
                           ...l,
                           {
                             station_id: "",
-                            produit: "essence",
+                            produit: "",
                             quantite_commandee: "",
                             prix_unitaire: "",
                           },
@@ -619,25 +626,23 @@ export function AchatCarburantPage() {
                         onValueChange={(v) =>
                           setLignesBC((l) =>
                             l.map((li, i) =>
-                              i === idx
-                                ? { ...li, produit: v as ProduitCarburant }
-                                : li,
+                              i === idx ? { ...li, produit: v ?? "" } : li,
                             ),
                           )
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue>
+                          <SelectValue placeholder="Type de carburant...">
                             {
-                              PRODUITS_CARBURANT.find(
-                                (p) => p.value === ligne.produit,
+                              (typesCarburant ?? []).find(
+                                (p) => p.id === ligne.produit,
                               )?.label
                             }
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          {PRODUITS_CARBURANT.map((p) => (
-                            <SelectItem key={p.value} value={p.value}>
+                          {(typesCarburant ?? []).map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
                               {p.label}
                             </SelectItem>
                           ))}

@@ -29,6 +29,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
 import {
   prixCarburantService,
   type PrixCarburantRow,
@@ -39,9 +40,7 @@ import { useAuthStore } from "@/stores/authStore";
 const schema = z
   .object({
     station_id: z.string().min(1, "Station obligatoire"),
-    type_carburant: z.enum(["essence", "gasoil", "gpl"], {
-      message: "Type de carburant obligatoire",
-    }),
+    type_carburant_id: z.string().uuid("Type de carburant obligatoire"),
     prix_vente: z.number().positive("Le prix de vente doit être > 0"),
     marge_litre: z.number().positive("La marge doit être > 0"),
   })
@@ -74,6 +73,7 @@ export function PrixCarburantPage() {
   const entrepriseId = entreprise?.id;
   const queryClient = useQueryClient();
   const [selectedStationId, setSelectedStationId] = useState<string>("");
+  const { data: typesCarburant } = useTypesCarburantActifs();
 
   const { data: stations } = useQuery({
     queryKey: ["stations", entrepriseId],
@@ -100,7 +100,7 @@ export function PrixCarburantPage() {
     resolver: zodResolver(schema),
     defaultValues: {
       station_id: "",
-      type_carburant: undefined,
+      type_carburant_id: "",
       prix_vente: 0,
       marge_litre: 0,
     },
@@ -111,7 +111,18 @@ export function PrixCarburantPage() {
   const prixAchatCalc = Number(prixVente) - Number(marge);
 
   const mutation = useMutation({
-    mutationFn: (data: FormData) => prixCarburantService.create(data),
+    mutationFn: (data: FormData) => {
+      const tc = (typesCarburant ?? []).find(
+        (t) => t.id === data.type_carburant_id,
+      );
+      return prixCarburantService.create({
+        station_id: data.station_id,
+        type_carburant_id: data.type_carburant_id,
+        type_carburant: tc?.label,
+        prix_vente: data.prix_vente,
+        marge_litre: data.marge_litre,
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["prix-carburant", selectedStationId],
@@ -119,7 +130,7 @@ export function PrixCarburantPage() {
       toast.success("Nouveau prix enregistré");
       reset({
         station_id: selectedStationId,
-        type_carburant: undefined,
+        type_carburant_id: "",
         prix_vente: 0,
         marge_litre: 0,
       });
@@ -183,24 +194,23 @@ export function PrixCarburantPage() {
                   </Label>
                   <Select
                     onValueChange={(v: string | null) =>
-                      setValue(
-                        "type_carburant",
-                        (v ?? "essence") as FormData["type_carburant"],
-                      )
+                      setValue("type_carburant_id", v ?? "")
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="essence">Essence</SelectItem>
-                      <SelectItem value="gasoil">Gasoil</SelectItem>
-                      <SelectItem value="petrole">Petrole</SelectItem>
+                      {(typesCarburant ?? []).map((tc) => (
+                        <SelectItem key={tc.id} value={tc.id}>
+                          {tc.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  {errors.type_carburant && (
+                  {errors.type_carburant_id && (
                     <p className="text-destructive text-xs">
-                      {errors.type_carburant.message}
+                      {errors.type_carburant_id.message}
                     </p>
                   )}
                 </div>
@@ -301,8 +311,12 @@ export function PrixCarburantPage() {
                           <TableCell className="text-xs">
                             {formatDate(row.date_effet)}
                           </TableCell>
-                          <TableCell className="text-xs capitalize">
-                            {row.type_carburant}
+                          <TableCell className="text-xs">
+                            {(typesCarburant ?? []).find(
+                              (t) => t.id === row.type_carburant_id,
+                            )?.label ??
+                              row.type_carburant ??
+                              "—"}
                           </TableCell>
                           <TableCell className="text-right text-xs font-mono">
                             {formatMontant(row.prix_vente)}

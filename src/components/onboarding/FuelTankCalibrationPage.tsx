@@ -53,27 +53,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 // APEX 2026-05-15-03 : validation extraite (testable)
+import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
 import type { CalibrationPoint } from "@/lib/calibrageValidation";
 import { validateCalibrationPoints } from "@/lib/calibrageValidation";
 import { cuveService } from "@/services/cuveService";
 import { stationService } from "@/services/stationService";
 import { useAuthStore } from "@/stores/authStore";
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const FUEL_TYPES = [
-  { value: "SP95", label: "Essence SP95", compte: "310" as const },
-  { value: "SP91", label: "Essence SP91", compte: "310" as const },
-  { value: "GO", label: "Gasoil", compte: "320" as const },
-  { value: "Petrole", label: "Pétrole lampant", compte: "330" as const },
-] as const;
-
 // ─── Types ───────────────────────────────────────────────────────────────────────
 
 interface CuveDB {
   id: string;
   nom: string;
-  type_carburant: string;
+  type_carburant: string | null;
+  type_carburant_id: string | null;
   capacite_max: number | null;
   calibrages: { hauteur_cm: number; volume_litres: number }[];
 }
@@ -115,7 +108,7 @@ export function FuelTankCalibrationPage() {
 
   const [newCuve, setNewCuve] = useState({
     nom: "",
-    type_carburant: "SP95" as string,
+    type_carburant_id: "",
     capacite_max: "",
   });
   const [isCreatingCuve, setIsCreatingCuve] = useState(false);
@@ -142,6 +135,8 @@ export function FuelTankCalibrationPage() {
     enabled: !!entreprise?.id,
   });
 
+  const { data: typesCarburant } = useTypesCarburantActifs();
+
   const { data: cuves = [], refetch: refetchCuves } = useQuery({
     queryKey: ["cuves-with-calibrages", selectedStationId],
     queryFn: () => cuveService.getCuvesByStation(selectedStationId),
@@ -159,25 +154,31 @@ export function FuelTankCalibrationPage() {
       toast.error("Veuillez sélectionner une station");
       return;
     }
+    if (!newCuve.type_carburant_id) {
+      toast.error("Sélectionnez un type de carburant");
+      return;
+    }
     setIsCreatingCuve(true);
     try {
-      const fuelType = FUEL_TYPES.find(
-        (f) => f.value === newCuve.type_carburant,
+      const tc = (typesCarburant ?? []).find(
+        (t) => t.id === newCuve.type_carburant_id,
       );
       await cuveService.createCuve({
         station_id: selectedStationId,
         nom: newCuve.nom,
-        type_carburant: newCuve.type_carburant as
-          | "SP95"
-          | "SP91"
-          | "GO"
-          | "Petrole",
-        compte_stock: fuelType?.compte ?? "310",
+        type_carburant_id: newCuve.type_carburant_id,
+        // Compat legacy : champ string alimenté via le label, le trigger DB le synchronise.
+        type_carburant: tc?.label ?? null,
+        compte_stock: tc?.compte_stock ?? "310",
         capacite_max: newCuve.capacite_max
           ? Number(newCuve.capacite_max)
           : null,
       });
-      setNewCuve({ nom: "", type_carburant: "SP95", capacite_max: "" });
+      setNewCuve({
+        nom: "",
+        type_carburant_id: typesCarburant?.[0]?.id ?? "",
+        capacite_max: "",
+      });
       await refetchCuves();
       toast.success("Cuve ajoutée");
     } catch (e) {
@@ -486,17 +487,20 @@ export function FuelTankCalibrationPage() {
                     Type carburant
                   </Label>
                   <Select
-                    value={newCuve.type_carburant}
+                    value={newCuve.type_carburant_id}
                     onValueChange={(v) =>
-                      setNewCuve((p) => ({ ...p, type_carburant: v ?? "SP95" }))
+                      setNewCuve((p) => ({
+                        ...p,
+                        type_carburant_id: v ?? "",
+                      }))
                     }
                   >
                     <SelectTrigger className="bg-white/10 border-white/20 text-white h-9">
-                      <SelectValue />
+                      <SelectValue placeholder="Sélectionner..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {FUEL_TYPES.map((f) => (
-                        <SelectItem key={f.value} value={f.value}>
+                      {(typesCarburant ?? []).map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
                           {f.label}
                         </SelectItem>
                       ))}
@@ -589,8 +593,11 @@ export function FuelTankCalibrationPage() {
                       )}
                     </div>
                     <p className="text-slate-400 text-xs">
-                      {FUEL_TYPES.find((f) => f.value === cuve.type_carburant)
-                        ?.label ?? cuve.type_carburant}
+                      {(typesCarburant ?? []).find(
+                        (f) => f.id === cuve.type_carburant_id,
+                      )?.label ??
+                        cuve.type_carburant ??
+                        "—"}
                       {cuve.capacite_max
                         ? ` — ${cuve.capacite_max.toLocaleString()} L`
                         : ""}

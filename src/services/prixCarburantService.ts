@@ -8,7 +8,10 @@ export type PrixCarburantRow =
 
 export interface CreatePrixCarburantInput {
   station_id: string;
-  type_carburant: string;
+  /** Libellé legacy (compat) — laissé en option, le trigger DB le dérive depuis type_carburant_id si absent. */
+  type_carburant?: string;
+  /** UUID du type carburant (référentiel types_carburant). Recommandé. */
+  type_carburant_id?: string;
   prix_vente: number;
   marge_litre: number;
   date_effet?: string;
@@ -57,7 +60,8 @@ export const prixCarburantService = {
     // prix_achat est GENERATED ALWAYS AS (prix_vente - marge_litre) STORED — ne pas l'insérer
     const payload: Database["public"]["Tables"]["prix_carburant"]["Insert"] = {
       station_id: input.station_id,
-      type_carburant: input.type_carburant,
+      type_carburant: input.type_carburant ?? null,
+      type_carburant_id: input.type_carburant_id ?? null,
       prix_vente: input.prix_vente,
       marge_litre: input.marge_litre,
       date_effet: input.date_effet ?? new Date().toISOString().split("T")[0],
