@@ -116,7 +116,7 @@ export function SuiviCuvesReport() {
       let query = supabase
         .from("vue_mouvements_stock")
         .select(
-          "date_mouvement, cuve_id, cuve_nom, type, sens, quantite, stock_avant, stock_apres, type_carburant",
+          "date_mouvement, cuve_id, cuve_nom, type, sens, quantite, stock_avant, stock_apres, type_carburant_label",
         )
         .eq("entreprise_id", entreprise.id)
         .in("station_id", stationFilter)

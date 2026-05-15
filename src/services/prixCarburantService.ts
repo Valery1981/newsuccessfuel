@@ -41,6 +41,7 @@ export const prixCarburantService = {
     // Garder le plus récent par type_carburant
     const byType = new Map<string, PrixCarburantRow>();
     for (const row of data ?? []) {
+      if (!row.type_carburant) continue;
       if (!byType.has(row.type_carburant)) {
         byType.set(row.type_carburant, row);
       }

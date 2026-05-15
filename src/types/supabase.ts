@@ -896,7 +896,8 @@ export type Database = {
           nom: string;
           station_id: string | null;
           stock_actuel_litres: number | null;
-          type_carburant: string;
+          type_carburant: string | null;
+          type_carburant_id: string | null;
           updated_at: string | null;
         };
         Insert: {
@@ -909,7 +910,8 @@ export type Database = {
           nom: string;
           station_id?: string | null;
           stock_actuel_litres?: number | null;
-          type_carburant: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           updated_at?: string | null;
         };
         Update: {
@@ -922,7 +924,8 @@ export type Database = {
           nom?: string;
           station_id?: string | null;
           stock_actuel_litres?: number | null;
-          type_carburant?: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           updated_at?: string | null;
         };
         Relationships: [
@@ -931,6 +934,13 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "cuves_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -1693,7 +1703,8 @@ export type Database = {
           id: string;
           quantite_commandee: number | null;
           station_id: string | null;
-          type_carburant: string;
+          type_carburant: string | null;
+          type_carburant_id: string | null;
         };
         Insert: {
           achat_id?: string | null;
@@ -1701,7 +1712,8 @@ export type Database = {
           id?: string;
           quantite_commandee?: number | null;
           station_id?: string | null;
-          type_carburant: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
         };
         Update: {
           achat_id?: string | null;
@@ -1709,7 +1721,8 @@ export type Database = {
           id?: string;
           quantite_commandee?: number | null;
           station_id?: string | null;
-          type_carburant?: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
         };
         Relationships: [
           {
@@ -1724,6 +1737,13 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lignes_bc_carburant_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -1955,7 +1975,8 @@ export type Database = {
           pistolet_id: string | null;
           prix_vente: number;
           shift_id: string | null;
-          type_carburant: string;
+          type_carburant: string | null;
+          type_carburant_id: string | null;
           volume_vendu: number | null;
         };
         Insert: {
@@ -1969,7 +1990,8 @@ export type Database = {
           pistolet_id?: string | null;
           prix_vente: number;
           shift_id?: string | null;
-          type_carburant: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           volume_vendu?: number | null;
         };
         Update: {
@@ -1983,7 +2005,8 @@ export type Database = {
           pistolet_id?: string | null;
           prix_vente?: number;
           shift_id?: string | null;
-          type_carburant?: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           volume_vendu?: number | null;
         };
         Relationships: [
@@ -2006,6 +2029,13 @@ export type Database = {
             columns: ["shift_id"];
             isOneToOne: false;
             referencedRelation: "shifts_carburant";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "lignes_shift_carburant_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -2250,6 +2280,7 @@ export type Database = {
           station_id: string | null;
           type: string;
           type_carburant: string | null;
+          type_carburant_id: string | null;
           valeur: number;
         };
         Insert: {
@@ -2260,6 +2291,7 @@ export type Database = {
           station_id?: string | null;
           type: string;
           type_carburant?: string | null;
+          type_carburant_id?: string | null;
           valeur: number;
         };
         Update: {
@@ -2270,6 +2302,7 @@ export type Database = {
           station_id?: string | null;
           type?: string;
           type_carburant?: string | null;
+          type_carburant_id?: string | null;
           valeur?: number;
         };
         Relationships: [
@@ -2278,6 +2311,13 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "objectifs_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -2666,7 +2706,8 @@ export type Database = {
           is_active: boolean | null;
           numero: string;
           station_id: string | null;
-          type_carburant: string;
+          type_carburant: string | null;
+          type_carburant_id: string | null;
           updated_at: string | null;
         };
         Insert: {
@@ -2677,7 +2718,8 @@ export type Database = {
           is_active?: boolean | null;
           numero: string;
           station_id?: string | null;
-          type_carburant: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           updated_at?: string | null;
         };
         Update: {
@@ -2688,7 +2730,8 @@ export type Database = {
           is_active?: boolean | null;
           numero?: string;
           station_id?: string | null;
-          type_carburant?: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
           updated_at?: string | null;
         };
         Relationships: [
@@ -2704,6 +2747,13 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pistolets_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -2811,7 +2861,8 @@ export type Database = {
           prix_achat: number | null;
           prix_vente: number;
           station_id: string | null;
-          type_carburant: string;
+          type_carburant: string | null;
+          type_carburant_id: string | null;
         };
         Insert: {
           created_at?: string | null;
@@ -2821,7 +2872,8 @@ export type Database = {
           prix_achat?: number | null;
           prix_vente: number;
           station_id?: string | null;
-          type_carburant: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
         };
         Update: {
           created_at?: string | null;
@@ -2831,7 +2883,8 @@ export type Database = {
           prix_achat?: number | null;
           prix_vente?: number;
           station_id?: string | null;
-          type_carburant?: string;
+          type_carburant?: string | null;
+          type_carburant_id?: string | null;
         };
         Relationships: [
           {
@@ -2839,6 +2892,13 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "prix_carburant_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
             referencedColumns: ["id"];
           },
         ];
@@ -3212,6 +3272,64 @@ export type Database = {
             columns: ["station_id"];
             isOneToOne: false;
             referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      station_modification_requests: {
+        Row: {
+          commentaire: string | null;
+          created_at: string | null;
+          id: string;
+          requested_by: string;
+          services_demandes: Json;
+          station_id: string;
+          statut: string;
+          validated_at: string | null;
+          validated_by: string | null;
+        };
+        Insert: {
+          commentaire?: string | null;
+          created_at?: string | null;
+          id?: string;
+          requested_by: string;
+          services_demandes?: Json;
+          station_id: string;
+          statut?: string;
+          validated_at?: string | null;
+          validated_by?: string | null;
+        };
+        Update: {
+          commentaire?: string | null;
+          created_at?: string | null;
+          id?: string;
+          requested_by?: string;
+          services_demandes?: Json;
+          station_id?: string;
+          statut?: string;
+          validated_at?: string | null;
+          validated_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "station_modification_requests_requested_by_fkey";
+            columns: ["requested_by"];
+            isOneToOne: false;
+            referencedRelation: "comptes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "station_modification_requests_station_id_fkey";
+            columns: ["station_id"];
+            isOneToOne: false;
+            referencedRelation: "stations";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "station_modification_requests_validated_by_fkey";
+            columns: ["validated_by"];
+            isOneToOne: false;
+            referencedRelation: "comptes";
             referencedColumns: ["id"];
           },
         ];
@@ -3718,22 +3836,65 @@ export type Database = {
           },
         ];
       };
+      types_carburant: {
+        Row: {
+          actif: boolean;
+          code: string;
+          compte_stock: string;
+          compte_vente: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          label: string;
+          ordre: number;
+          partenaire_id: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          actif?: boolean;
+          code: string;
+          compte_stock: string;
+          compte_vente: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          label: string;
+          ordre?: number;
+          partenaire_id?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          actif?: boolean;
+          code?: string;
+          compte_stock?: string;
+          compte_vente?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          label?: string;
+          ordre?: number;
+          partenaire_id?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "types_carburant_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "comptes";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "types_carburant_partenaire_id_fkey";
+            columns: ["partenaire_id"];
+            isOneToOne: false;
+            referencedRelation: "partenaires";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
-      vue_plan_comptable_complet: {
-        Row: {
-          id: string | null;
-          numero: string | null;
-          libelle: string | null;
-          classe: number | null;
-          is_centralisateur: boolean | null;
-          numero_parent: string | null;
-          is_modifiable: boolean | null;
-          source: string | null;
-          entreprise_id: string | null;
-        };
-        Relationships: [];
-      };
       mv_ca_mensuel: {
         Row: {
           ca_boutique: number | null;
@@ -4046,10 +4207,19 @@ export type Database = {
           stock_apres: number | null;
           stock_avant: number | null;
           type: Database["public"]["Enums"]["mouvement_type"] | null;
-          type_carburant: string | null;
+          type_carburant_code: string | null;
+          type_carburant_id: string | null;
+          type_carburant_label: string | null;
           valeur_totale: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: "cuves_type_carburant_id_fkey";
+            columns: ["type_carburant_id"];
+            isOneToOne: false;
+            referencedRelation: "types_carburant";
+            referencedColumns: ["id"];
+          },
           {
             foreignKeyName: "mouvements_stock_article_id_fkey";
             columns: ["article_id"];
@@ -4108,10 +4278,29 @@ export type Database = {
           },
         ];
       };
+      vue_plan_comptable_complet: {
+        Row: {
+          classe: number | null;
+          entreprise_id: string | null;
+          id: string | null;
+          is_centralisateur: boolean | null;
+          is_modifiable: boolean | null;
+          libelle: string | null;
+          numero: string | null;
+          numero_parent: string | null;
+          source: string | null;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      auth_can_see_tm: {
+        Args: { tm_supabase_user_id: string };
+        Returns: boolean;
+      };
       auth_get_compte_id: { Args: never; Returns: string };
       auth_is_superadmin: { Args: never; Returns: boolean };
+      auth_visible_partenaire_ids: { Args: never; Returns: string[] };
       auth_write_entreprise_ids: { Args: never; Returns: string[] };
       auth_write_station_ids: { Args: never; Returns: string[] };
       calculer_capital_net: {
@@ -4343,24 +4532,6 @@ export type CompositeTypes<
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never;
 
-export type AccountType = Database["public"]["Enums"]["account_type"];
-export type AchatStatut = Database["public"]["Enums"]["achat_statut"];
-export type DoleanceStatut = Database["public"]["Enums"]["doleance_statut"];
-export type EcritureStatut = Database["public"]["Enums"]["ecriture_statut"];
-export type FamilleProduit = Database["public"]["Enums"]["famille_produit"];
-export type InventaireStatut = Database["public"]["Enums"]["inventaire_statut"];
-export type InventaireType = Database["public"]["Enums"]["inventaire_type"];
-export type MotifEcart = Database["public"]["Enums"]["motif_ecart"];
-export type MouvementType = Database["public"]["Enums"]["mouvement_type"];
-export type NotifType = Database["public"]["Enums"]["notif_type"];
-export type OperationHorsAvType =
-  Database["public"]["Enums"]["operation_hors_av_type"];
-export type PartenaireType = Database["public"]["Enums"]["partenaire_type"];
-export type SessionStatus = Database["public"]["Enums"]["session_status"];
-export type ShiftStatut = Database["public"]["Enums"]["shift_statut"];
-export type StationStatus = Database["public"]["Enums"]["station_status"];
-export type TiersType = Database["public"]["Enums"]["tiers_type"];
-
 export const Constants = {
   public: {
     Enums: {
@@ -4424,3 +4595,21 @@ export const Constants = {
     },
   },
 } as const;
+
+export type AccountType = Database["public"]["Enums"]["account_type"];
+export type AchatStatut = Database["public"]["Enums"]["achat_statut"];
+export type DoleanceStatut = Database["public"]["Enums"]["doleance_statut"];
+export type EcritureStatut = Database["public"]["Enums"]["ecriture_statut"];
+export type FamilleProduit = Database["public"]["Enums"]["famille_produit"];
+export type InventaireStatut = Database["public"]["Enums"]["inventaire_statut"];
+export type InventaireType = Database["public"]["Enums"]["inventaire_type"];
+export type MotifEcart = Database["public"]["Enums"]["motif_ecart"];
+export type MouvementType = Database["public"]["Enums"]["mouvement_type"];
+export type NotifType = Database["public"]["Enums"]["notif_type"];
+export type OperationHorsAvType =
+  Database["public"]["Enums"]["operation_hors_av_type"];
+export type PartenaireType = Database["public"]["Enums"]["partenaire_type"];
+export type SessionStatus = Database["public"]["Enums"]["session_status"];
+export type ShiftStatut = Database["public"]["Enums"]["shift_statut"];
+export type StationStatus = Database["public"]["Enums"]["station_status"];
+export type TiersType = Database["public"]["Enums"]["tiers_type"];

@@ -44,6 +44,7 @@ export const partnerKPIService = {
     const grouped = new Map<string, number>();
     for (const row of data ?? []) {
       const type = row.type_carburant;
+      if (!type) continue;
       const quantite = row.quantite_commandee ?? 0;
       grouped.set(type, (grouped.get(type) ?? 0) + quantite);
     }
@@ -78,6 +79,7 @@ export const partnerKPIService = {
     const grouped = new Map<string, number>();
     for (const row of data ?? []) {
       const type = row.type_carburant;
+      if (!type) continue;
       const volume = row.volume_vendu ?? 0;
       grouped.set(type, (grouped.get(type) ?? 0) + volume);
     }

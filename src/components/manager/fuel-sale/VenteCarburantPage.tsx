@@ -206,15 +206,18 @@ export function VenteCarburantPage() {
       const volumeVendu = indexFinalNum - idxInitial;
 
       // Prix de vente actuel pour ce type de carburant à cette station
-      const { data: prixRow } = await supabase
-        .from("prix_carburant")
-        .select("prix_vente")
-        .eq("station_id", shiftRow.station_id!)
-        .eq("type_carburant", pistoletRow.type_carburant)
-        .order("date_effet", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      const prixVente = prixRow?.prix_vente ?? 0;
+      let prixVente = 0;
+      if (pistoletRow.type_carburant) {
+        const { data: prixRow } = await supabase
+          .from("prix_carburant")
+          .select("prix_vente")
+          .eq("station_id", shiftRow.station_id!)
+          .eq("type_carburant", pistoletRow.type_carburant)
+          .order("date_effet", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        prixVente = prixRow?.prix_vente ?? 0;
+      }
       const caTotal = volumeVendu * prixVente;
 
       // Insérer ligne de shift

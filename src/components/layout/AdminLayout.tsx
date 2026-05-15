@@ -7,6 +7,7 @@ import { useSidebarStore } from "@/stores/sidebarStore";
 import {
   Bug,
   CreditCard,
+  Fuel,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -56,6 +57,7 @@ const navSections: NavSection[] = [
         badge: 0,
       },
       { href: "/admin/subscriptions", label: "Abonnements", icon: CreditCard },
+      { href: "/admin/types-carburant", label: "Types carburant", icon: Fuel },
     ],
   },
   {
