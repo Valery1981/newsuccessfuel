@@ -33,12 +33,16 @@ import {
   type ObjectifRow,
   type StationWithEntreprise,
 } from "@/services/partnerService";
-import { stationService } from "@/services/stationService";
+import {
+  stationService,
+  type ModificationRequest,
+} from "@/services/stationService";
 import { tmService } from "@/services/tmService";
 import { useAuthStore } from "@/stores/authStore";
 import type { Database } from "@/types/supabase";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   Ban,
   Building2,
   Car,
@@ -148,16 +152,26 @@ function ServicesBadges({ station }: { station: StationWithEntreprise }) {
 function StationCard({
   station,
   onDetail,
+  hasPendingRequests,
 }: {
   station: StationWithEntreprise;
   onDetail: (s: StationWithEntreprise) => void;
+  hasPendingRequests?: boolean;
 }) {
   return (
     <Card className="flex flex-col justify-between hover:shadow-md transition-shadow">
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base">{station.nom}</CardTitle>
-          <StatutBadge statut={station.status ?? "en_attente"} />
+          <div className="flex items-center gap-1.5 shrink-0">
+            {hasPendingRequests && (
+              <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5">
+                <AlertTriangle className="h-3 w-3" />
+                Modif.
+              </span>
+            )}
+            <StatutBadge statut={station.status ?? "en_attente"} />
+          </div>
         </div>
         {station.entreprises?.nom && (
           <p className="text-xs text-muted-foreground">
@@ -271,6 +285,43 @@ function StationDetailDialog({
   const { compte } = useAuthStore();
   const queryClient = useQueryClient();
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [validatingRequest, setValidatingRequest] = useState<string | null>(
+    null,
+  );
+
+  const { data: pendingRequests = [], refetch: refetchRequests } = useQuery<
+    ModificationRequest[]
+  >({
+    queryKey: ["station-mod-requests", station?.id],
+    queryFn: () => stationService.getPendingRequestsByStation(station!.id),
+    enabled: !!station?.id,
+  });
+
+  const handleValidateRequest = async (
+    requestId: string,
+    statut: "validee" | "rejetee",
+  ) => {
+    if (!compte?.id) return;
+    setValidatingRequest(requestId);
+    try {
+      await stationService.validateModificationRequest(
+        requestId,
+        statut,
+        compte.id,
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["stations-partenaire"],
+      });
+      await refetchRequests();
+      toast.success(
+        statut === "validee" ? "Modifications appliquées" : "Demande rejetée",
+      );
+    } catch {
+      toast.error("Erreur lors de la validation");
+    } finally {
+      setValidatingRequest(null);
+    }
+  };
 
   const { data: tms } = useQuery({
     queryKey: ["tms"],
@@ -482,6 +533,87 @@ function StationDetailDialog({
             <ObjectifsSection stationId={station.id} />
           </section>
 
+          {/* Demandes de modification de services */}
+          {pendingRequests.length > 0 && (
+            <section>
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                Modifications de services en attente ({pendingRequests.length})
+              </h3>
+              <div className="space-y-3">
+                {pendingRequests.map((req) => {
+                  const labels: Record<string, string> = {
+                    has_marchandises_generales: "Marchandises générales",
+                    has_lubrifiants: "Lubrifiants",
+                    has_gpl: "GPL",
+                    has_lavage: "Lavage auto",
+                    has_parking: "Parking",
+                    has_vulcanisation: "Vulcanisation",
+                    has_boutique: "Boutique",
+                  };
+                  const services = Object.entries(req.services_demandes)
+                    .filter(([k]) => k !== "has_boutique")
+                    .map(([k, v]) => ({ label: labels[k] ?? k, enabled: v }));
+                  return (
+                    <div
+                      key={req.id}
+                      className="rounded-lg border p-3 space-y-2"
+                    >
+                      <p className="text-xs text-muted-foreground">
+                        Soumis le{" "}
+                        {new Date(req.created_at).toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {services.map(({ label, enabled }) => (
+                          <span
+                            key={label}
+                            className={`text-xs rounded-full px-2 py-0.5 border ${
+                              enabled
+                                ? "bg-green-50 text-green-700 border-green-200"
+                                : "bg-red-50 text-red-600 border-red-200 line-through opacity-60"
+                            }`}
+                          >
+                            {enabled ? "+ " : "− "}
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 text-white h-7 text-xs"
+                          disabled={validatingRequest === req.id}
+                          onClick={() =>
+                            handleValidateRequest(req.id, "validee")
+                          }
+                        >
+                          <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                          Approuver
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-7 text-xs"
+                          disabled={validatingRequest === req.id}
+                          onClick={() =>
+                            handleValidateRequest(req.id, "rejetee")
+                          }
+                        >
+                          <Ban className="h-3.5 w-3.5 mr-1" />
+                          Rejeter
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
           {/* Date validation */}
           {station.valide_at && (
             <section className="border-t pt-4">
@@ -519,6 +651,21 @@ export function PartnerStationsPage() {
     queryFn: () => partnerService.getStationsByPartenaire(partenaire!.id),
     enabled: !!partenaire?.id,
   });
+
+  const { data: partnerPendingRequests = [] } = useQuery<ModificationRequest[]>(
+    {
+      queryKey: ["partner-mod-requests", partenaire?.id],
+      queryFn: () => stationService.getPartnerPendingRequests(partenaire!.id),
+      enabled: !!partenaire?.id,
+    },
+  );
+
+  const pendingCountByStation = partnerPendingRequests.reduce<
+    Record<string, number>
+  >((acc, r) => {
+    acc[r.station_id] = (acc[r.station_id] ?? 0) + 1;
+    return acc;
+  }, {});
 
   const stationsFiltrees = useMemo(
     () =>
@@ -647,6 +794,7 @@ export function PartnerStationsPage() {
               key={station.id}
               station={station}
               onDetail={setStationDetail}
+              hasPendingRequests={(pendingCountByStation[station.id] ?? 0) > 0}
             />
           ))}
         </div>

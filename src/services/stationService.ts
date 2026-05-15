@@ -111,4 +111,108 @@ export const stationService = {
     const { error } = await supabase.from("stations").delete().eq("id", id);
     if (error) throw error;
   },
+
+  async createModificationRequest(
+    stationId: string,
+    requestedBy: string,
+    servicesDemandes: Record<string, boolean>,
+  ) {
+    const { data, error } = await supabase
+      .from("station_modification_requests" as never)
+      .insert({
+        station_id: stationId,
+        requested_by: requestedBy,
+        services_demandes: servicesDemandes,
+        statut: "en_attente",
+      } as never)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async getPendingRequestsByStation(stationId: string) {
+    const { data, error } = await supabase
+      .from("station_modification_requests" as never)
+      .select("*")
+      .eq("station_id" as never, stationId)
+      .eq("statut" as never, "en_attente")
+      .order("created_at" as never, { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as ModificationRequest[];
+  },
+
+  async getPendingRequestsByEntreprise(stationIds: string[]) {
+    if (stationIds.length === 0) return [];
+    const { data, error } = await supabase
+      .from("station_modification_requests" as never)
+      .select("*")
+      .in("station_id" as never, stationIds)
+      .eq("statut" as never, "en_attente");
+    if (error) throw error;
+    return (data ?? []) as ModificationRequest[];
+  },
+
+  async validateModificationRequest(
+    requestId: string,
+    statut: "validee" | "rejetee",
+    validatedBy: string,
+    commentaire?: string,
+  ) {
+    const { data: req, error: fetchErr } = await supabase
+      .from("station_modification_requests" as never)
+      .select("*")
+      .eq("id" as never, requestId)
+      .single();
+    if (fetchErr) throw fetchErr;
+    const r = req as ModificationRequest;
+
+    if (statut === "validee") {
+      await supabase
+        .from("stations")
+        .update(r.services_demandes as StationUpdate)
+        .eq("id", r.station_id);
+    }
+
+    const { error } = await supabase
+      .from("station_modification_requests" as never)
+      .update({
+        statut,
+        validated_by: validatedBy,
+        validated_at: new Date().toISOString(),
+        commentaire: commentaire ?? null,
+      } as never)
+      .eq("id" as never, requestId);
+    if (error) throw error;
+  },
+
+  async getPartnerPendingRequests(partenaireId: string) {
+    const { data: stationsData, error: stErr } = await supabase
+      .from("stations")
+      .select("id")
+      .eq("partenaire_id", partenaireId);
+    if (stErr) throw stErr;
+    const ids = (stationsData ?? []).map((s) => s.id);
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from("station_modification_requests" as never)
+      .select("*")
+      .in("station_id" as never, ids)
+      .eq("statut" as never, "en_attente")
+      .order("created_at" as never, { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as ModificationRequest[];
+  },
+};
+
+export type ModificationRequest = {
+  id: string;
+  station_id: string;
+  requested_by: string;
+  services_demandes: Record<string, boolean>;
+  statut: "en_attente" | "validee" | "rejetee";
+  commentaire: string | null;
+  created_at: string;
+  validated_at: string | null;
+  validated_by: string | null;
 };
