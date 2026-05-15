@@ -400,3 +400,49 @@
 **Vérification DB** : 9 trésoreries + 3 tiers visibles dans la vue.
 
 **Qualité** : ESLint 0 / TS 0 / Vitest 143 passants / Build vert.
+
+---
+
+### ACTION #012 — APEX 2026-05-15-08 : Plan Comptable DB conformité ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ — DB déjà conforme, aucune migration nécessaire
+
+**Vérification DB** (78 comptes dans `plan_comptable_standard`) :
+
+- Classe 1 (5) : 101, 120, 161, 455, 457 ✅
+- Classe 2 (6) : 211, 215, 218, 220, 228, 240 ✅
+- Classe 3 (7) : 310, 320, 330, 340, 350, 360, 370 ✅
+- Classe 4 (9) : 401, 411, 421, 431, 432, 444, 447, 4454, 460 ✅
+- Classe 5 (4) : 512, 513, 514, 530 ✅
+- Classe 6 (30) : 601, 602, **603 centralisateur**, **6031-6037**, 605-620, 630, 640, 651, 652, 653, 654, 661, 690 ✅
+- Classe 7 (17) : **706 centralisateur**, **7061-7069**, **707 centralisateur**, **7071-7077**, 751, 752, 753, 761 ✅
+
+Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-comptes correctement parentés via `numero_parent`.
+
+**Conclusion** : conformité 100% Guide §8.1. ACTION #007 (2026-05-03) avait déjà appliqué le plan comptable correctement. Pas d'écart détecté.
+
+---
+
+### ACTION #013 — APEX 2026-05-15-02 : Initialisation 2 colonnes + volume auto-calculé ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ
+
+**Objectif** : conformité Guide §9 (layout 2 colonnes) + Guide §10.2 ligne 418 (Volume = jauge × calibrages, auto).
+
+**Réalisations** :
+
+- `CompanyInitialisationPage.tsx` :
+  - Type `CuveRow` étendu pour inclure `calibrages[]` (joint via `cuveService.getCuvesByStation`)
+  - Onglet Cuves : input "Volume (L)" remplacé par affichage **lecture seule** calculé via `interpolateVolume(cuve.calibrages, jauge_cm)` (Guide §14 règle 4)
+  - `saveCuvesMutation` : volume calculé depuis la jauge avant insertion en DB (plus de saisie manuelle)
+  - `computedTotals` : valorisation cuves recalculée depuis la jauge auto-interpolée
+  - Layout : grille `lg:grid-cols-[1fr_420px]` — colonne droite (Tabs), colonne gauche (Synthèse sticky `lg:top-4`). Sur mobile (< lg), Synthèse remonte en haut via `order-1 lg:order-2`.
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 143 passants / Build vert.
+
+**Résout** :
+
+- Exemple #2 (layout 2 colonnes Initialisation)
+- Exemple #3 (Volume Cuves auto-calculé via calibrages)

@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, interpolateVolume } from "@/lib/utils";
 import { cuveService } from "@/services/cuveService";
 import { initialisationService } from "@/services/initialisationService";
 import { pistoletService } from "@/services/pistoletService";
@@ -43,7 +43,10 @@ import type { Database } from "@/types/supabase";
 
 type InitialisationRow = Database["public"]["Tables"]["initialisation"]["Row"];
 type StationRow = Database["public"]["Tables"]["stations"]["Row"];
-type CuveRow = Database["public"]["Tables"]["cuves"]["Row"];
+// APEX 2026-05-15-02 : cuveService.getCuvesByStation joint les calibrages
+type CuveRow = Database["public"]["Tables"]["cuves"]["Row"] & {
+  calibrages?: Array<{ hauteur_cm: number; volume_litres: number }>;
+};
 type PistoletRow = Database["public"]["Tables"]["pistolets"]["Row"];
 
 interface TiersAccount {
@@ -162,7 +165,10 @@ export function CompanyInitialisationPage() {
 
   const { data: cuves } = useQuery<CuveRow[]>({
     queryKey: ["cuves", selectedStation],
-    queryFn: () => cuveService.getCuvesByStation(selectedStation),
+    queryFn: async () =>
+      (await cuveService.getCuvesByStation(
+        selectedStation,
+      )) as unknown as CuveRow[],
     enabled: !!selectedStation,
   });
 
@@ -174,12 +180,17 @@ export function CompanyInitialisationPage() {
 
   // ── Computed totals ───────────────────────────────────────────────────
   const computedTotals = useMemo(() => {
+    // APEX 2026-05-15-02 : volume calculé depuis la jauge via calibrages (Guide §10.2)
     const cuveTotal = (cuves ?? []).reduce((sum, c) => {
       const data = cuveJauges[c.id];
       if (!data) return sum;
-      return (
-        sum + (Number(data.volume_litres) || 0) * (Number(data.prix_achat) || 0)
-      );
+      const jauge = Number(data.jauge_cm) || 0;
+      const calibrages = c.calibrages ?? [];
+      const volume =
+        calibrages.length > 0 && jauge > 0
+          ? interpolateVolume(calibrages, jauge)
+          : 0;
+      return sum + volume * (Number(data.prix_achat) || 0);
     }, 0);
 
     const boutiqueTotal = (boutiqueItems ?? []).reduce((sum, b) => {
@@ -262,15 +273,24 @@ export function CompanyInitialisationPage() {
   const saveCuvesMutation = useMutation({
     mutationFn: async () => {
       if (!initialisation) throw new Error("Session invalide");
+      // APEX 2026-05-15-02 : volume calculé depuis la jauge via calibrages (Guide §10.2 ligne 418)
       const entries = (cuves ?? [])
         .filter((c) => cuveJauges[c.id])
-        .map((c) => ({
-          cuve_id: c.id,
-          station_id: selectedStation,
-          jauge_initiale_cm: Number(cuveJauges[c.id].jauge_cm),
-          volume_initial_litres: Number(cuveJauges[c.id].volume_litres),
-          prix_achat_initial: Number(cuveJauges[c.id].prix_achat),
-        }));
+        .map((c) => {
+          const jauge = Number(cuveJauges[c.id].jauge_cm);
+          const calibrages = c.calibrages ?? [];
+          const volume =
+            calibrages.length > 0 && jauge > 0
+              ? interpolateVolume(calibrages, jauge)
+              : 0;
+          return {
+            cuve_id: c.id,
+            station_id: selectedStation,
+            jauge_initiale_cm: jauge,
+            volume_initial_litres: volume,
+            prix_achat_initial: Number(cuveJauges[c.id].prix_achat),
+          };
+        });
       await initialisationService.saveInitialisationCuves(
         initialisation.id,
         entries,
@@ -491,213 +511,282 @@ export function CompanyInitialisationPage() {
         </CardContent>
       </Card>
 
-      <Tabs defaultValue="cuves">
-        <TabsList className="flex-wrap">
-          <TabsTrigger value="cuves">Cuves</TabsTrigger>
-          <TabsTrigger value="pistolets">Index Pistolets</TabsTrigger>
-          <TabsTrigger value="stock-boutique">Stock Boutique</TabsTrigger>
-          <TabsTrigger value="tresorerie">Trésorerie</TabsTrigger>
-          <TabsTrigger value="tiers">Créances</TabsTrigger>
-          <TabsTrigger value="dettes">Dettes</TabsTrigger>
-          <TabsTrigger value="immobilisations">Immobilisations</TabsTrigger>
-        </TabsList>
+      {/* APEX 2026-05-15-02 : layout 2 colonnes — droite Tabs, gauche Synthèse sticky (Guide §9) */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6">
+        <div className="order-2 lg:order-1 min-w-0">
+          <Tabs defaultValue="cuves">
+            <TabsList className="flex-wrap">
+              <TabsTrigger value="cuves">Cuves</TabsTrigger>
+              <TabsTrigger value="pistolets">Index Pistolets</TabsTrigger>
+              <TabsTrigger value="stock-boutique">Stock Boutique</TabsTrigger>
+              <TabsTrigger value="tresorerie">Trésorerie</TabsTrigger>
+              <TabsTrigger value="tiers">Créances</TabsTrigger>
+              <TabsTrigger value="dettes">Dettes</TabsTrigger>
+              <TabsTrigger value="immobilisations">Immobilisations</TabsTrigger>
+            </TabsList>
 
-        {/* Tab Cuves */}
-        <TabsContent value="cuves">
-          <Card>
-            <CardHeader>
-              <CardTitle>Jauges initiales des cuves</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!selectedStation ? (
-                <p className="text-muted-foreground text-sm">
-                  Sélectionnez une station pour voir ses cuves
-                </p>
-              ) : (
-                <>
-                  {(cuves ?? []).map((cuve) => (
+            {/* Tab Cuves */}
+            <TabsContent value="cuves">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Jauges initiales des cuves</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!selectedStation ? (
+                    <p className="text-muted-foreground text-sm">
+                      Sélectionnez une station pour voir ses cuves
+                    </p>
+                  ) : (
+                    <>
+                      {(cuves ?? []).map((cuve) => (
+                        <div
+                          key={cuve.id}
+                          className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                        >
+                          <div>
+                            <Badge className="mb-2">
+                              {cuve.nom} ({cuve.type_carburant})
+                            </Badge>
+                          </div>
+                          <div className="sm:col-span-2 grid grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Jauge (cm)</Label>
+                              <Input
+                                type="number"
+                                value={cuveJauges[cuve.id]?.jauge_cm ?? ""}
+                                onChange={(e) =>
+                                  setCuveJauges((prev) => ({
+                                    ...prev,
+                                    [cuve.id]: {
+                                      ...prev[cuve.id],
+                                      jauge_cm: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="0"
+                                min={0}
+                                max={300}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                Volume (L) — calculé
+                              </Label>
+                              {/* APEX 2026-05-15-02 : volume auto-calculé via calibrages (Guide §10.2 ligne 418) */}
+                              <div className="h-9 px-3 flex items-center rounded-md border bg-muted text-sm font-mono">
+                                {(() => {
+                                  const jauge = parseFloat(
+                                    cuveJauges[cuve.id]?.jauge_cm ?? "",
+                                  );
+                                  if (!jauge || jauge <= 0) return "—";
+                                  if (
+                                    !cuve.calibrages ||
+                                    cuve.calibrages.length === 0
+                                  )
+                                    return "Cuve non calibrée";
+                                  const v = interpolateVolume(
+                                    cuve.calibrages,
+                                    jauge,
+                                  );
+                                  return v.toLocaleString("fr-FR") + " L";
+                                })()}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                Prix achat (MGA/L)
+                              </Label>
+                              <Input
+                                type="number"
+                                value={cuveJauges[cuve.id]?.prix_achat ?? ""}
+                                onChange={(e) =>
+                                  setCuveJauges((prev) => ({
+                                    ...prev,
+                                    [cuve.id]: {
+                                      ...prev[cuve.id],
+                                      prix_achat: e.target.value,
+                                    },
+                                  }))
+                                }
+                                placeholder="0"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        onClick={() => saveCuvesMutation.mutate()}
+                        disabled={saveCuvesMutation.isPending}
+                      >
+                        {saveCuvesMutation.isPending && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        Enregistrer les cuves
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab Pistolets */}
+            <TabsContent value="pistolets">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Index de départ des pistolets</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!selectedStation ? (
+                    <p className="text-muted-foreground text-sm">
+                      Sélectionnez une station pour voir ses pistolets
+                    </p>
+                  ) : (
+                    <>
+                      {(pistolets ?? []).map((pistolet) => (
+                        <div
+                          key={pistolet.id}
+                          className="flex items-center gap-4 p-3 border rounded-lg"
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium">{pistolet.numero}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {pistolet.type_carburant}
+                            </p>
+                          </div>
+                          <div className="w-40">
+                            <Input
+                              type="number"
+                              value={pistoletIndexes[pistolet.id] ?? ""}
+                              onChange={(e) =>
+                                setPistoletIndexes((prev) => ({
+                                  ...prev,
+                                  [pistolet.id]: e.target.value,
+                                }))
+                              }
+                              placeholder="Index initial"
+                              min={0}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        onClick={() => savePistoletsMutation.mutate()}
+                        disabled={savePistoletsMutation.isPending}
+                      >
+                        {savePistoletsMutation.isPending && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        Enregistrer les index
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab Stock Boutique */}
+            <TabsContent value="stock-boutique">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Stock Boutique Initial</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!selectedStation ? (
+                    <p className="text-muted-foreground text-sm">
+                      Sélectionnez une station pour voir ses articles boutique
+                    </p>
+                  ) : (
+                    <>
+                      {(boutiqueItems ?? []).map((item) => (
+                        <div
+                          key={item.product_id}
+                          className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 border rounded-lg"
+                        >
+                          <div className="sm:col-span-2">
+                            <p className="font-medium">{item.product_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {item.family_name}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Prix achat (MGA)</Label>
+                            <Input
+                              type="number"
+                              value={item.purchase_price}
+                              disabled
+                              className="bg-muted"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Quantité initiale</Label>
+                            <Input
+                              type="number"
+                              value={boutiqueStocks[item.product_id]?.qty || ""}
+                              onChange={(e) => {
+                                const qty = e.target.value;
+                                const value =
+                                  parseAmt(qty) * item.purchase_price;
+                                setBoutiqueStocks((prev) => ({
+                                  ...prev,
+                                  [item.product_id]: { qty, value },
+                                }));
+                              }}
+                              placeholder="0"
+                              min={0}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <Button
+                        onClick={() => saveBoutiqueMutation.mutate()}
+                        disabled={saveBoutiqueMutation.isPending}
+                      >
+                        {saveBoutiqueMutation.isPending && (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        )}
+                        Enregistrer le stock boutique
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab Trésorerie */}
+            <TabsContent value="tresorerie">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Soldes Trésorerie Initiaux</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ces données s&apos;appliquent à l&apos;ensemble de
+                      l&apos;entreprise (toutes les stations).
+                    </p>
+                  </div>
+                  {(accountsBundle?.treasury ?? []).map((t) => (
                     <div
-                      key={cuve.id}
+                      key={t.id}
                       className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
                     >
-                      <div>
-                        <Badge className="mb-2">
-                          {cuve.nom} ({cuve.type_carburant})
-                        </Badge>
-                      </div>
-                      <div className="sm:col-span-2 grid grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Jauge (cm)</Label>
-                          <Input
-                            type="number"
-                            value={cuveJauges[cuve.id]?.jauge_cm ?? ""}
-                            onChange={(e) =>
-                              setCuveJauges((prev) => ({
-                                ...prev,
-                                [cuve.id]: {
-                                  ...prev[cuve.id],
-                                  jauge_cm: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="0"
-                            min={0}
-                            max={300}
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Volume (L)</Label>
-                          <Input
-                            type="number"
-                            value={cuveJauges[cuve.id]?.volume_litres ?? ""}
-                            onChange={(e) =>
-                              setCuveJauges((prev) => ({
-                                ...prev,
-                                [cuve.id]: {
-                                  ...prev[cuve.id],
-                                  volume_litres: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Prix achat (MGA/L)</Label>
-                          <Input
-                            type="number"
-                            value={cuveJauges[cuve.id]?.prix_achat ?? ""}
-                            onChange={(e) =>
-                              setCuveJauges((prev) => ({
-                                ...prev,
-                                [cuve.id]: {
-                                  ...prev[cuve.id],
-                                  prix_achat: e.target.value,
-                                },
-                              }))
-                            }
-                            placeholder="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    onClick={() => saveCuvesMutation.mutate()}
-                    disabled={saveCuvesMutation.isPending}
-                  >
-                    {saveCuvesMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    Enregistrer les cuves
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Pistolets */}
-        <TabsContent value="pistolets">
-          <Card>
-            <CardHeader>
-              <CardTitle>Index de départ des pistolets</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!selectedStation ? (
-                <p className="text-muted-foreground text-sm">
-                  Sélectionnez une station pour voir ses pistolets
-                </p>
-              ) : (
-                <>
-                  {(pistolets ?? []).map((pistolet) => (
-                    <div
-                      key={pistolet.id}
-                      className="flex items-center gap-4 p-3 border rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <p className="font-medium">{pistolet.numero}</p>
+                      <div className="sm:col-span-2">
+                        <p className="font-medium">{t.libelle}</p>
                         <p className="text-sm text-muted-foreground">
-                          {pistolet.type_carburant}
+                          Compte: {t.numero_compte}
                         </p>
                       </div>
-                      <div className="w-40">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Solde initial (MGA)</Label>
                         <Input
                           type="number"
-                          value={pistoletIndexes[pistolet.id] ?? ""}
+                          value={tresorerieSoldes[t.id] || ""}
                           onChange={(e) =>
-                            setPistoletIndexes((prev) => ({
+                            setTresorerieSoldes((prev) => ({
                               ...prev,
-                              [pistolet.id]: e.target.value,
+                              [t.id]: e.target.value,
                             }))
                           }
-                          placeholder="Index initial"
-                          min={0}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                  <Button
-                    onClick={() => savePistoletsMutation.mutate()}
-                    disabled={savePistoletsMutation.isPending}
-                  >
-                    {savePistoletsMutation.isPending && (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    )}
-                    Enregistrer les index
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Stock Boutique */}
-        <TabsContent value="stock-boutique">
-          <Card>
-            <CardHeader>
-              <CardTitle>Stock Boutique Initial</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!selectedStation ? (
-                <p className="text-muted-foreground text-sm">
-                  Sélectionnez une station pour voir ses articles boutique
-                </p>
-              ) : (
-                <>
-                  {(boutiqueItems ?? []).map((item) => (
-                    <div
-                      key={item.product_id}
-                      className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 border rounded-lg"
-                    >
-                      <div className="sm:col-span-2">
-                        <p className="font-medium">{item.product_name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.family_name}
-                        </p>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Prix achat (MGA)</Label>
-                        <Input
-                          type="number"
-                          value={item.purchase_price}
-                          disabled
-                          className="bg-muted"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Quantité initiale</Label>
-                        <Input
-                          type="number"
-                          value={boutiqueStocks[item.product_id]?.qty || ""}
-                          onChange={(e) => {
-                            const qty = e.target.value;
-                            const value = parseAmt(qty) * item.purchase_price;
-                            setBoutiqueStocks((prev) => ({
-                              ...prev,
-                              [item.product_id]: { qty, value },
-                            }));
-                          }}
                           placeholder="0"
                           min={0}
                         />
@@ -705,332 +794,287 @@ export function CompanyInitialisationPage() {
                     </div>
                   ))}
                   <Button
-                    onClick={() => saveBoutiqueMutation.mutate()}
-                    disabled={saveBoutiqueMutation.isPending}
+                    onClick={() => saveComptesMutation.mutate("tresorerie")}
+                    disabled={saveComptesMutation.isPending}
                   >
-                    {saveBoutiqueMutation.isPending && (
+                    {saveComptesMutation.isPending && (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     )}
-                    Enregistrer le stock boutique
+                    Enregistrer les trésoreries
                   </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-        {/* Tab Trésorerie */}
-        <TabsContent value="tresorerie">
-          <Card>
-            <CardHeader>
-              <CardTitle>Soldes Trésorerie Initiaux</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  Ces données s&apos;appliquent à l&apos;ensemble de
-                  l&apos;entreprise (toutes les stations).
-                </p>
-              </div>
-              {(accountsBundle?.treasury ?? []).map((t) => (
-                <div
-                  key={t.id}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
-                >
-                  <div className="sm:col-span-2">
-                    <p className="font-medium">{t.libelle}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Compte: {t.numero_compte}
+            {/* Tab Créances */}
+            <TabsContent value="tiers">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Créances Initiales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ces données s&apos;appliquent à l&apos;ensemble de
+                      l&apos;entreprise (toutes les stations).
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Solde initial (MGA)</Label>
-                    <Input
-                      type="number"
-                      value={tresorerieSoldes[t.id] || ""}
-                      onChange={(e) =>
-                        setTresorerieSoldes((prev) => ({
-                          ...prev,
-                          [t.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              ))}
-              <Button
-                onClick={() => saveComptesMutation.mutate("tresorerie")}
-                disabled={saveComptesMutation.isPending}
-              >
-                {saveComptesMutation.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                Enregistrer les trésoreries
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Créances */}
-        <TabsContent value="tiers">
-          <Card>
-            <CardHeader>
-              <CardTitle>Créances Initiales</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  Ces données s&apos;appliquent à l&apos;ensemble de
-                  l&apos;entreprise (toutes les stations).
-                </p>
-              </div>
-              {(accountsBundle?.receivable ?? []).map((r: TiersAccount) => (
-                <div
-                  key={r.id}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
-                >
-                  <div className="sm:col-span-2">
-                    <p className="font-medium">{r.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Compte: {r.account_id} · Type: {r.type}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">
-                      Solde initial (débit, MGA)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={creancesSoldes[r.id] || ""}
-                      onChange={(e) =>
-                        setCreancesSoldes((prev) => ({
-                          ...prev,
-                          [r.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              ))}
-              <Button
-                onClick={() => saveComptesMutation.mutate("creances")}
-                disabled={saveComptesMutation.isPending}
-              >
-                {saveComptesMutation.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                Enregistrer les créances
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Dettes */}
-        <TabsContent value="dettes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Dettes Initiales</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  Ces données s&apos;appliquent à l&apos;ensemble de
-                  l&apos;entreprise (toutes les stations).
-                </p>
-              </div>
-              {(accountsBundle?.payable ?? []).map((p: TiersAccount) => (
-                <div
-                  key={p.id}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
-                >
-                  <div className="sm:col-span-2">
-                    <p className="font-medium">{p.label}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Compte: {p.account_id} · Type: {p.type}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">
-                      Solde initial (crédit, MGA)
-                    </Label>
-                    <Input
-                      type="number"
-                      value={dettesSoldes[p.id] || ""}
-                      onChange={(e) =>
-                        setDettesSoldes((prev) => ({
-                          ...prev,
-                          [p.id]: e.target.value,
-                        }))
-                      }
-                      placeholder="0"
-                      min={0}
-                    />
-                  </div>
-                </div>
-              ))}
-              <Button
-                onClick={() => saveComptesMutation.mutate("dettes")}
-                disabled={saveComptesMutation.isPending}
-              >
-                {saveComptesMutation.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                Enregistrer les dettes
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Immobilisations */}
-        <TabsContent value="immobilisations">
-          <Card>
-            <CardHeader>
-              <CardTitle>Immobilisations Initiales</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm text-blue-800">
-                  Ces données s&apos;appliquent à l&apos;ensemble de
-                  l&apos;entreprise (toutes les stations).
-                </p>
-              </div>
-              {(accountsBundle?.fixed_assets ?? []).map(
-                (a: FixedAssetAccount) => (
-                  <div
-                    key={a.account_id}
-                    className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                  {(accountsBundle?.receivable ?? []).map((r: TiersAccount) => (
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                    >
+                      <div className="sm:col-span-2">
+                        <p className="font-medium">{r.label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Compte: {r.account_id} · Type: {r.type}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Solde initial (débit, MGA)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={creancesSoldes[r.id] || ""}
+                          onChange={(e) =>
+                            setCreancesSoldes((prev) => ({
+                              ...prev,
+                              [r.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="0"
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => saveComptesMutation.mutate("creances")}
+                    disabled={saveComptesMutation.isPending}
                   >
-                    <div className="sm:col-span-2">
-                      <p className="font-medium">{a.label}</p>
-                      <p className="text-sm text-muted-foreground">
-                        Compte: {a.account_id}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Valeur initiale (MGA)</Label>
-                      <Input
-                        type="number"
-                        value={immobilisations[a.account_id] || ""}
-                        onChange={(e) =>
-                          setImmobilisations((prev) => ({
-                            ...prev,
-                            [a.account_id]: e.target.value,
-                          }))
-                        }
-                        placeholder="0"
-                        min={0}
-                      />
-                    </div>
+                    {saveComptesMutation.isPending && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Enregistrer les créances
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab Dettes */}
+            <TabsContent value="dettes">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Dettes Initiales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ces données s&apos;appliquent à l&apos;ensemble de
+                      l&apos;entreprise (toutes les stations).
+                    </p>
                   </div>
-                ),
-              )}
-              <Button
-                onClick={() => saveComptesMutation.mutate("immobilisations")}
-                disabled={saveComptesMutation.isPending}
-              >
-                {saveComptesMutation.isPending && (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                )}
-                Enregistrer les immobilisations
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  {(accountsBundle?.payable ?? []).map((p: TiersAccount) => (
+                    <div
+                      key={p.id}
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                    >
+                      <div className="sm:col-span-2">
+                        <p className="font-medium">{p.label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Compte: {p.account_id} · Type: {p.type}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Solde initial (crédit, MGA)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={dettesSoldes[p.id] || ""}
+                          onChange={(e) =>
+                            setDettesSoldes((prev) => ({
+                              ...prev,
+                              [p.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="0"
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => saveComptesMutation.mutate("dettes")}
+                    disabled={saveComptesMutation.isPending}
+                  >
+                    {saveComptesMutation.isPending && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Enregistrer les dettes
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-      {/* Balance Sheet Summary - Synthèse du bilan d'ouverture */}
-      <Card className="bg-slate-50 border-2 border-slate-200">
-        <CardHeader>
-          <CardTitle className="text-lg font-bold text-slate-800">
-            Synthèse du bilan d&apos;ouverture
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Actif */}
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-              Actif
-            </p>
-            <div className="space-y-1">
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Stock carburant (toutes stations)</span>
-                <span className="font-mono">{fmt(summary.fuel)}</span>
+            {/* Tab Immobilisations */}
+            <TabsContent value="immobilisations">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Immobilisations Initiales</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-blue-800">
+                      Ces données s&apos;appliquent à l&apos;ensemble de
+                      l&apos;entreprise (toutes les stations).
+                    </p>
+                  </div>
+                  {(accountsBundle?.fixed_assets ?? []).map(
+                    (a: FixedAssetAccount) => (
+                      <div
+                        key={a.account_id}
+                        className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                      >
+                        <div className="sm:col-span-2">
+                          <p className="font-medium">{a.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Compte: {a.account_id}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            Valeur initiale (MGA)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={immobilisations[a.account_id] || ""}
+                            onChange={(e) =>
+                              setImmobilisations((prev) => ({
+                                ...prev,
+                                [a.account_id]: e.target.value,
+                              }))
+                            }
+                            placeholder="0"
+                            min={0}
+                          />
+                        </div>
+                      </div>
+                    ),
+                  )}
+                  <Button
+                    onClick={() =>
+                      saveComptesMutation.mutate("immobilisations")
+                    }
+                    disabled={saveComptesMutation.isPending}
+                  >
+                    {saveComptesMutation.isPending && (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    )}
+                    Enregistrer les immobilisations
+                  </Button>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+        {/* Balance Sheet Summary - Synthèse du bilan d'ouverture (APEX 2026-05-15-02 : colonne gauche sticky) */}
+        <aside className="order-1 lg:order-2 lg:sticky lg:top-4 self-start">
+          <Card className="bg-slate-50 border-2 border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-slate-800">
+                Synthèse du bilan d&apos;ouverture
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Actif */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                  Actif
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Stock carburant (toutes stations)</span>
+                    <span className="font-mono">{fmt(summary.fuel)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Stock boutique (toutes stations)</span>
+                    <span className="font-mono">{fmt(summary.boutique)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Trésoreries (entreprise)</span>
+                    <span className="font-mono">{fmt(summary.treasury)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Créances (entreprise)</span>
+                    <span className="font-mono">{fmt(summary.receivable)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Immobilisations (entreprise)</span>
+                    <span className="font-mono">{fmt(summary.asset)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
+                    <span>= Total Actif</span>
+                    <span className="font-mono">{fmt(summary.totalActif)}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Stock boutique (toutes stations)</span>
-                <span className="font-mono">{fmt(summary.boutique)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Trésoreries (entreprise)</span>
-                <span className="font-mono">{fmt(summary.treasury)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Créances (entreprise)</span>
-                <span className="font-mono">{fmt(summary.receivable)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Immobilisations (entreprise)</span>
-                <span className="font-mono">{fmt(summary.asset)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
-                <span>= Total Actif</span>
-                <span className="font-mono">{fmt(summary.totalActif)}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Passif */}
-          <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-              Passif
-            </p>
-            <div className="space-y-1">
-              <div className="flex justify-between text-sm text-slate-600 pl-4">
-                <span>Dettes (entreprise)</span>
-                <span className="font-mono">{fmt(summary.payable)}</span>
+              {/* Passif */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                  Passif
+                </p>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-sm text-slate-600 pl-4">
+                    <span>Dettes (entreprise)</span>
+                    <span className="font-mono">{fmt(summary.payable)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
+                    <span>= Total Passif</span>
+                    <span className="font-mono">
+                      {fmt(summary.totalPassif)}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
-                <span>= Total Passif</span>
-                <span className="font-mono">{fmt(summary.totalPassif)}</span>
-              </div>
-            </div>
-          </div>
 
-          {/* Capital Net Initial */}
-          <div
-            className={`flex justify-between items-center p-4 rounded-lg border-2 ${
-              summary.capitalNet >= 0
-                ? "bg-green-50 border-green-300"
-                : "bg-red-50 border-red-300"
-            }`}
-          >
-            <div>
-              <p
-                className={`font-bold text-sm ${
-                  summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
+              {/* Capital Net Initial */}
+              <div
+                className={`flex justify-between items-center p-4 rounded-lg border-2 ${
+                  summary.capitalNet >= 0
+                    ? "bg-green-50 border-green-300"
+                    : "bg-red-50 border-red-300"
                 }`}
               >
-                Capital Net Initial
-              </p>
-              <p className="text-xs text-slate-600 mt-1">
-                Total Actif − Total Passif · lecture seule · agrégat entreprise
-                (données enregistrées)
-              </p>
-            </div>
-            <span
-              className={`font-mono font-extrabold text-xl ${
-                summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
-              }`}
-            >
-              {fmt(summary.capitalNet)}
-            </span>
-          </div>
-        </CardContent>
-      </Card>
+                <div>
+                  <p
+                    className={`font-bold text-sm ${
+                      summary.capitalNet >= 0
+                        ? "text-green-700"
+                        : "text-red-700"
+                    }`}
+                  >
+                    Capital Net Initial
+                  </p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Total Actif − Total Passif · lecture seule · agrégat
+                    entreprise (données enregistrées)
+                  </p>
+                </div>
+                <span
+                  className={`font-mono font-extrabold text-xl ${
+                    summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
+                  }`}
+                >
+                  {fmt(summary.capitalNet)}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
 
       {/* APEX-16-final : Dialog validation avec aperçu A Nouveau (§5.5-23) */}
       <Dialog open={confirmValidate} onOpenChange={setConfirmValidate}>
