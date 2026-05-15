@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { PermissionGate } from "@/components/auth/PermissionGate";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -420,16 +421,18 @@ export function VenteCarburantPage() {
                             </Badge>
                           </div>
                         </div>
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            setSelectedShift(shift);
-                            setClotureDialogOpen(true);
-                          }}
-                        >
-                          <Lock className="w-4 h-4 mr-1" />
-                          Clôturer
-                        </Button>
+                        <PermissionGate permission="traitement_vente_carburant_cloture">
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setSelectedShift(shift);
+                              setClotureDialogOpen(true);
+                            }}
+                          >
+                            <Lock className="w-4 h-4 mr-1" />
+                            Clôturer
+                          </Button>
+                        </PermissionGate>
                       </div>
                     </CardContent>
                   </Card>

@@ -482,3 +482,50 @@ Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-co
 **Audit Realtime résiduel** : `src/hooks/useRealtimeNotifications.ts` uniquement — conforme.
 
 **Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.
+
+---
+
+### ACTION #016 — APEX 2026-05-15-04 : Noperations architecture audit ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ — VirementInterne déjà conforme, refactor des sous-dossiers déclassé NOOP
+
+**Audit** :
+
+- VirementInterne **existe** comme Dialog inline dans `ManagerNonSalesOperationsPage.tsx` (lignes 304-497) avec écritures comptables conformes Guide §10.8 :
+  - DÉBIT `tresorerie_dest_id` (entrante)
+  - CRÉDIT `tresorerie_source_id` (sortante)
+  - Insertion `ecritures_comptables` + 2 lignes `lignes_ecriture` + `operations_hors_av`
+- Les 6 dialogs (Charges, Salaires, Encaissement, Reglement, Gérant, Immobilisations) existent à plat dans `noperations/`
+- Les sous-dossiers `noperations/{ChargesCourantes,Creances,...}/` restent vides
+
+**Décision** : la refactorisation déplaçant les dialogs vers leurs sous-dossiers est purement cosmétique et présente un risque de régression sans bénéfice fonctionnel. Reportée. Si nécessaire un jour pour la lisibilité, faire un re-export proprement.
+
+**Conformité Guide §10.8** : OK pour les 7 opérations (1 inline + 6 dialogs).
+
+**Action effective** : aucune modification de code (audit uniquement).
+
+---
+
+### ACTION #017 — APEX 2026-05-15-07 : PermissionGate + boutons sensibles ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ (premier lot — autres pages à wrapper progressivement selon besoin)
+
+**Audit initial** : `useAuth.hasPermission()` existait mais **0 usage** dans le code → permissions définies mais jamais appliquées en UX.
+
+**Réalisations** :
+
+- `src/components/auth/PermissionGate.tsx` créé : composant déclaratif `<PermissionGate permission="...">{children}</PermissionGate>`
+- `AchatCarburantPage.tsx` : boutons **Mouvementer** + **Comptabiliser** wrappés (clés `traitement_achat_carburant_mouvementer` et `_comptabiliser`)
+- `VenteCarburantPage.tsx` : bouton **Clôturer** shift wrappé (`traitement_vente_carburant_cloture`)
+
+**Reste à appliquer** (non bloquant — gérant a toujours toutes les permissions, impact session_gerant uniquement) :
+
+- POS Boutique (`traitement_boutique_pos`)
+- Régulariser inventaire (`traitement_inventaire_regulariser`)
+- Transfert stock (`traitement_transfert_stock`)
+- Opérations hors A&V (`traitement_operations`)
+- Doléances créer (`doleances`)
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.

@@ -1,5 +1,6 @@
 ﻿"use client";
 
+import { PermissionGate } from "@/components/auth/PermissionGate";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -441,28 +442,32 @@ export function AchatCarburantPage() {
                         <TableCell>
                           <div className="flex gap-1">
                             {achat.statut === "livre" && !achat.mouvemente && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs"
-                                onClick={() =>
-                                  mouvementerMutation.mutate(achat.id)
-                                }
-                                disabled={mouvementerMutation.isPending}
-                              >
-                                Mouvementer
-                              </Button>
+                              <PermissionGate permission="traitement_achat_carburant_mouvementer">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() =>
+                                    mouvementerMutation.mutate(achat.id)
+                                  }
+                                  disabled={mouvementerMutation.isPending}
+                                >
+                                  Mouvementer
+                                </Button>
+                              </PermissionGate>
                             )}
                             {achat.mouvemente && !achat.comptabilise && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-xs"
-                                onClick={() => setPreviewComptaAchat(achat)}
-                                disabled={comptabiliserMutation.isPending}
-                              >
-                                Comptabiliser
-                              </Button>
+                              <PermissionGate permission="traitement_achat_carburant_comptabiliser">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs"
+                                  onClick={() => setPreviewComptaAchat(achat)}
+                                  disabled={comptabiliserMutation.isPending}
+                                >
+                                  Comptabiliser
+                                </Button>
+                              </PermissionGate>
                             )}
                             <Button
                               size="sm"
