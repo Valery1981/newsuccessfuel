@@ -111,13 +111,13 @@
   --nav3: #122850;
 
   /* Backgrounds */
-  --background: #0d1b2e;
-  --bg2: #111f33;
-  --bg3: #162638;
-  --bg4: #1c2f45;
+  --background: #0d1b2ecc;
+  --bg2: #111f33cc;
+  --bg3: #162638cc;
+  --bg4: #1c2f45cc;
 
   /* Cards */
-  --card: #152233;
+  --card: #152233cc;
   --card-foreground: #eef2f8;
 
   /* Text */
@@ -134,11 +134,11 @@
   /* Semantic */
   --primary: #f5820a;
   --primary-foreground: #ffffff;
-  --secondary: #162638;
+  --secondary: #162638cc;
   --secondary-foreground: #eef2f8;
-  --muted: #1c2f45;
+  --muted: #1c2f45cc;
   --muted-foreground: #4d6680;
-  --accent: #1c2f45;
+  --accent: #1c2f45cc;
   --accent-foreground: #eef2f8;
   --destructive: #ef4444;
   --input: rgba(255, 255, 255, 0.08);
@@ -185,19 +185,19 @@
 
 /* .dark kept for compatibility but theme is already dark */
 .dark {
-  --background: #0d1b2e;
+  --background: #0d1b2ecc;
   --foreground: #eef2f8;
-  --card: #152233;
+  --card: #152233cc;
   --card-foreground: #eef2f8;
   --popover: #162638;
   --popover-foreground: #eef2f8;
   --primary: #f5820a;
   --primary-foreground: #ffffff;
-  --secondary: #162638;
+  --secondary: #162638cc;
   --secondary-foreground: #eef2f8;
-  --muted: #1c2f45;
+  --muted: #1c2f45cc;
   --muted-foreground: #4d6680;
-  --accent: #1c2f45;
+  --accent: #1c2f45cc;
   --accent-foreground: #eef2f8;
   --destructive: #ef4444;
   --border: rgba(255, 255, 255, 0.07);

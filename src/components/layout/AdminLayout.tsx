@@ -3,12 +3,15 @@
 import { FusedLogo } from "@/components/common/FusedLogo";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/useAuth";
+import { useSidebarStore } from "@/stores/sidebarStore";
 import {
   Bug,
   CreditCard,
   LayoutDashboard,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   ScrollText,
   Settings,
@@ -78,9 +81,10 @@ const PURPLE_BD = "rgba(139,92,246,0.22)";
 
 interface SidebarProps {
   onNavigate?: () => void;
+  collapsed?: boolean;
 }
 
-function SidebarContent({ onNavigate }: SidebarProps) {
+function SidebarContent({ onNavigate, collapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const { logout, compte } = useAuth();
 
@@ -110,45 +114,51 @@ function SidebarContent({ onNavigate }: SidebarProps) {
         className="px-4 py-[14px]"
         style={{ borderBottom: "0.5px solid var(--border)" }}
       >
-        <div className="flex items-center gap-[9px]">
+        <div
+          className={`flex items-center ${collapsed ? "justify-center" : "gap-[9px]"}`}
+        >
           <FusedLogo size={32} />
-          <div className="min-w-0 flex-1">
-            <p
-              style={{
-                fontSize: 14,
-                fontWeight: 800,
-                color: "#fff",
-                letterSpacing: "-0.3px",
-                lineHeight: 1,
-              }}
-            >
-              SuccessFuel
-            </p>
-            <p
-              style={{
-                fontSize: "9.5px",
-                color: "rgba(255,255,255,0.35)",
-                marginTop: 1,
-                textTransform: "uppercase",
-                letterSpacing: "0.4px",
-              }}
-            >
-              Super Admin
-            </p>
-          </div>
-          <span
-            style={{
-              fontSize: 9,
-              padding: "2px 7px",
-              borderRadius: 5,
-              fontWeight: 700,
-              background: PURPLE_BG,
-              color: PURPLE,
-              border: `0.5px solid ${PURPLE_BD}`,
-            }}
-          >
-            SA
-          </span>
+          {!collapsed && (
+            <>
+              <div className="min-w-0 flex-1">
+                <p
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: "#fff",
+                    letterSpacing: "-0.3px",
+                    lineHeight: 1,
+                  }}
+                >
+                  SuccessFuel
+                </p>
+                <p
+                  style={{
+                    fontSize: "9.5px",
+                    color: "rgba(255,255,255,0.35)",
+                    marginTop: 1,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.4px",
+                  }}
+                >
+                  Super Admin
+                </p>
+              </div>
+              <span
+                style={{
+                  fontSize: 9,
+                  padding: "2px 7px",
+                  borderRadius: 5,
+                  fontWeight: 700,
+                  background: PURPLE_BG,
+                  color: PURPLE,
+                  border: `0.5px solid ${PURPLE_BD}`,
+                }}
+              >
+                SA
+              </span>
+            </>
+          )}
         </div>
       </div>
 
@@ -156,7 +166,7 @@ function SidebarContent({ onNavigate }: SidebarProps) {
       <nav
         className="flex-1 overflow-y-auto"
         style={{
-          padding: "4px 8px",
+          padding: collapsed ? "4px 4px" : "4px 8px",
           display: "flex",
           flexDirection: "column",
           gap: 1,
@@ -164,28 +174,32 @@ function SidebarContent({ onNavigate }: SidebarProps) {
       >
         {navSections.map((section) => (
           <div key={section.label}>
-            <p
-              style={{
-                fontSize: 9,
-                fontWeight: 700,
-                color: "var(--txt4, #2E4560)",
-                textTransform: "uppercase",
-                letterSpacing: "0.8px",
-                padding: "9px 8px 3px",
-              }}
-            >
-              {section.label}
-            </p>
+            {!collapsed && (
+              <p
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: "var(--txt4, #2E4560)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.8px",
+                  padding: "9px 8px 3px",
+                }}
+              >
+                {section.label}
+              </p>
+            )}
             {section.items.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 onClick={onNavigate}
+                title={collapsed ? item.label : undefined}
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  padding: "8px 9px",
+                  justifyContent: collapsed ? "center" : undefined,
+                  gap: collapsed ? 0 : 8,
+                  padding: collapsed ? "10px 0" : "8px 9px",
                   borderRadius: 7,
                   fontSize: 12,
                   marginBottom: 1,
@@ -203,13 +217,15 @@ function SidebarContent({ onNavigate }: SidebarProps) {
                 <item.icon
                   className="shrink-0"
                   style={{
-                    width: 14,
-                    height: 14,
+                    width: collapsed ? 18 : 14,
+                    height: collapsed ? 18 : 14,
                     opacity: isActive(item.href) ? 1 : 0.7,
                   }}
                 />
-                <span className="flex-1 truncate">{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && (
+                {!collapsed && (
+                  <span className="flex-1 truncate">{item.label}</span>
+                )}
+                {!collapsed && item.badge !== undefined && item.badge > 0 && (
                   <span
                     style={{
                       fontSize: 9,
@@ -233,11 +249,12 @@ function SidebarContent({ onNavigate }: SidebarProps) {
       {/* User footer */}
       <div
         style={{
-          padding: "10px 12px",
+          padding: collapsed ? "10px 8px" : "10px 12px",
           borderTop: "0.5px solid var(--border)",
           display: "flex",
           alignItems: "center",
-          gap: 9,
+          justifyContent: collapsed ? "center" : undefined,
+          gap: collapsed ? 0 : 9,
         }}
       >
         <div
@@ -254,43 +271,55 @@ function SidebarContent({ onNavigate }: SidebarProps) {
         >
           {initials(compte?.nom)}
         </div>
-        <div className="flex-1 min-w-0">
-          <p
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "#fff",
-              lineHeight: 1.2,
-            }}
-            className="truncate"
-          >
-            {compte?.nom ?? "Super Admin"}
-          </p>
-          <p style={{ fontSize: 10, color: "var(--txt3, #4D6680)" }}>
-            Superadmin
-          </p>
-        </div>
-        <button
-          onClick={logout}
-          title="Déconnexion"
-          style={{
-            background: "transparent",
-            border: "none",
-            cursor: "pointer",
-            padding: 4,
-            borderRadius: 6,
-            color: "rgba(255,255,255,0.3)",
-          }}
-          className="hover:text-red-400 transition-colors"
-        >
-          <LogOut style={{ width: 14, height: 14 }} />
-        </button>
+        {!collapsed && (
+          <>
+            <div className="flex-1 min-w-0">
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#fff",
+                  lineHeight: 1.2,
+                }}
+                className="truncate"
+              >
+                {compte?.nom ?? "Super Admin"}
+              </p>
+              <p style={{ fontSize: 10, color: "var(--txt3, #4D6680)" }}>
+                Superadmin
+              </p>
+            </div>
+            <button
+              onClick={logout}
+              title="Déconnexion"
+              style={{
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                padding: 4,
+                borderRadius: 6,
+                color: "rgba(255,255,255,0.3)",
+              }}
+              className="hover:text-red-400 transition-colors"
+            >
+              <LogOut style={{ width: 14, height: 14 }} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
+function TopBar({
+  onMenuClick,
+  onToggleSidebar,
+  sidebarCollapsed,
+}: {
+  onMenuClick: () => void;
+  onToggleSidebar: () => void;
+  sidebarCollapsed: boolean;
+}) {
   const pathname = usePathname();
 
   const pageTitle = (() => {
@@ -333,6 +362,25 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
         >
           <Menu style={{ width: 18, height: 18 }} />
         </button>
+        <button
+          className="hidden md:flex items-center justify-center"
+          onClick={onToggleSidebar}
+          style={{
+            background: "transparent",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            borderRadius: 6,
+            color: "var(--txt2, #8BA4BF)",
+          }}
+          title={sidebarCollapsed ? "Ouvrir le menu" : "Réduire le menu"}
+        >
+          {sidebarCollapsed ? (
+            <PanelLeftOpen style={{ width: 18, height: 18 }} />
+          ) : (
+            <PanelLeftClose style={{ width: 18, height: 18 }} />
+          )}
+        </button>
         <p
           style={{ fontSize: 14, fontWeight: 700, color: "var(--foreground)" }}
         >
@@ -358,6 +406,7 @@ function TopBar({ onMenuClick }: { onMenuClick: () => void }) {
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { collapsed, toggle } = useSidebarStore();
 
   return (
     <div
@@ -365,10 +414,10 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       style={{ background: "var(--background)" }}
     >
       <aside
-        className="hidden md:flex flex-col shrink-0"
-        style={{ width: 230 }}
+        className="hidden md:flex flex-col shrink-0 transition-all duration-200"
+        style={{ width: collapsed ? 60 : 230, overflow: "hidden" }}
       >
-        <SidebarContent />
+        <SidebarContent collapsed={collapsed} />
       </aside>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -382,7 +431,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <TopBar onMenuClick={() => setMobileOpen(true)} />
+        <TopBar
+          onMenuClick={() => setMobileOpen(true)}
+          onToggleSidebar={toggle}
+          sidebarCollapsed={collapsed}
+        />
         <main className="flex-1 overflow-y-auto">{children}</main>
       </div>
     </div>
