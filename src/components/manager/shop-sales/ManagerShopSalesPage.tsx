@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CreditCard,
   Loader2,
@@ -29,7 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { useRealtimeStock } from "@/hooks/useRealtimeStock";
+// APEX 2026-05-15-05 : useRealtimeStock retiré (Guide §14 #14 — Realtime doléances uniquement).
+// Le rafraîchissement stock se fait par invalidation TanStack Query après mutation.
 import { buildTicketPrintHtml, openPrintWindow } from "@/lib/printUtils";
 import { formatCurrency } from "@/lib/utils";
 import { stationService } from "@/services/stationService";
@@ -63,9 +64,8 @@ interface ShiftBoutique {
 
 export function ManagerShopSalesPage() {
   const { entreprise } = useAuthStore();
-
-  // Enable real-time stock updates on sales
-  useRealtimeStock();
+  // APEX 2026-05-15-05 : invalidation ciblee remplace useRealtimeStock (Guide §14 #14)
+  const queryClient = useQueryClient();
 
   const [selectedStationId, setSelectedStationId] = useState("");
   const [activeShift, setActiveShift] = useState<ShiftBoutique | null>(null);
@@ -269,6 +269,10 @@ export function ManagerShopSalesPage() {
         .eq("id", activeShift.id);
 
       setLastTicketId(ticket.id);
+      // APEX 2026-05-15-05 : invalidation ciblée des stocks (remplace l'abonnement Realtime)
+      queryClient.invalidateQueries({ queryKey: ["articles"] });
+      queryClient.invalidateQueries({ queryKey: ["stock-boutique"] });
+      queryClient.invalidateQueries({ queryKey: ["stocks"] });
       toast.success(`Ticket créé — Total : ${formatCurrency(total)}`);
       setCart([]);
     } catch (error) {

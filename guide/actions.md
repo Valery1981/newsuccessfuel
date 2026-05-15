@@ -463,3 +463,22 @@ Centralisateurs vérifiés : 603, 706, 707 → `is_centralisateur=true`, sous-co
 - `FuelTankCalibrationPage.tsx` : import depuis le module extrait, suppression de la fonction inline (DRY)
 
 **Qualité** : ESLint 0 / TS 0 / Vitest 153 passants (143 → 153, +10) / Build vert.
+
+---
+
+### ACTION #015 — APEX 2026-05-15-05 : Realtime doléances uniquement ✅
+
+**Date** : 2026-05-15
+**Statut** : ✅ TERMINÉ
+
+**Objectif** : conformité Guide §14 règle 14 + §18 — "Supabase Realtime UNIQUEMENT pour doléances".
+
+**Réalisations** :
+
+- Suppression `src/hooks/useRealtimeStock.ts` (violait la règle)
+- `ManagerShopSalesPage.tsx` : remplacement de `useRealtimeStock()` par `queryClient.invalidateQueries(['articles', 'stock-boutique', 'stocks'])` après chaque vente
+- Seul `useRealtimeNotifications` (canal doléances) reste actif
+
+**Audit Realtime résiduel** : `src/hooks/useRealtimeNotifications.ts` uniquement — conforme.
+
+**Qualité** : ESLint 0 / TS 0 / Vitest 153 / Build vert.
