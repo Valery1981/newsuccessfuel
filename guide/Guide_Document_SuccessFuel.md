@@ -395,38 +395,121 @@ Utilisé dans la réception des achats carburant
 
 9. PAGE INITIALISATION — RÈGLES CRITIQUES
 Accès : Gérant uniquement (collaborateurs, partenaire et superadmin exclus)
+
+Architecture station vs entreprise (OBLIGATOIRE)
+
+A. Données niveau STATION (station_id obligatoire sur staging, mouvements et écritures) :
+- Cuves → stock carburant, CMUP, inventaires, shifts ; écritures 310/320/330 avec entreprise_id + station_id
+- Stock boutique → POS, stock, CAMV ; écritures 340–370 avec entreprise_id + station_id
+- Index pistolets → opérationnel uniquement (index_actuel) ; PAS d'écriture comptable
+
+B. Données niveau ENTREPRISE (station_id = NULL, is_central = true) :
+- Trésorerie, Créances (411/460), Dettes (401/autres), Immobilisations
+- Écritures A Nouveau centralisées ; agrégation globale société
+
+C. Bilan d'ouverture (synthèse latérale) :
+ACTIF = Σ stock carburant (toutes stations) + Σ stock boutique (toutes stations) + trésorerie + créances + immobilisations
+PASSIF = dettes entreprise
+Capital Net initial = Total Actif − Total Passif
+
+D. Filtrage rapports :
+- Rapport par station : uniquement écritures avec station_id = cette station
+- Rapport global entreprise : agrège écritures station + écritures centralisées (station_id NULL)
+
+Référence écriture : INIT:{initialisation_id}:{module}:{station_id|central}:{numero_compte}
+
 Logique Enregistrer vs Valider
 
-Enregistrer (par onglet) : sauvegarde temporaire, modifiable, aucune écriture générée
+Enregistrer (par onglet) — à chaque clic :
+
+Sauvegarde les données de l'onglet dans les tables initialisation_* (staging)
+Supprime puis recrée les écritures A Nouveau de cet onglet uniquement (pas de doublon)
+Met à jour immédiatement le bilan d'ouverture (synthèse) et le Grand Livre
+Reste modifiable tant que l'initialisation n'est pas validée
+Ne crée pas d'écriture si le montant est nul ou vide
+
 Valider Initialisation (bouton global, irréversible) :
 
-Génère les A Nouveau dans le Grand Livre pour tous les comptes renseignés
-Génère les entrées initiales dans les mouvements de stock
-Calcule et affiche Capital Net (101) = Total Actif − Total Dettes
-Affiche les Capitaux propres nets = 101 + 120
-Verrouille définitivement la page
+Ne génère AUCUNE nouvelle écriture comptable
+Ne crée AUCUN mouvement de stock à ce moment
+Vérifie que les étapes requises sont complètes ou volontairement ignorées
+Calcule et enregistre le Capital Net (101) = Total Actif − Total Dettes
+Verrouille définitivement la page (plus aucune modification possible)
 
+Règle anti-doublon (écritures A Nouveau)
 
+Chaque écriture d'initialisation est identifiable par une référence stable :
+
+entreprise_id + module_initialisation + station_id (si applicable) + numero_compte
+Format référence : INIT:{initialisation_id}:{module}:{station|central}:{numero_compte}
+
+Si le gérant modifie un montant puis clique à nouveau sur Enregistrer, l'écriture précédente du même module est remplacée (jamais dupliquée).
+
+Écritures A Nouveau — règles comptables
+
+Type d'opération : initialisation_a_nouveau
+Libellé : A Nouveau - Initialisation - [module]
+Date : date d'ouverture / date d'initialisation
+Chaque écriture est équilibrée (partie double) : compte concerné ↔ 101 Capital
+Comptes actif (stocks, trésorerie, créances, immobilisations) : DÉBIT compte / CRÉDIT 101
+Comptes passif (dettes) : CRÉDIT compte / DÉBIT 101
+Visibles immédiatement dans le Grand Livre après Enregistrer
 
 Éléments par Station (sélecteur de station en haut)
+
 Onglet Index Pistolets :
 
 Index de départ par pistolet — sert de base au premier shift uniquement
+Enregistrer : sauvegarde staging + mise à jour index_actuel des pistolets
+Pas d'écriture comptable (donnée opérationnelle uniquement)
 
 Onglet Cuves :
 
-Jauge (cm) → Volume (litres) calculé via calibrages → Valorisation auto
+Jauge (cm) → Volume (litres) via get_volume_from_jauge() (calibrages)
+Prix Achat = Prix de vente − Marge (depuis paramètre prix carburant de la station)
+Valeur stock = Volume × Prix Achat (affichée dans l'onglet et dans la synthèse bilan)
+Enregistrer :
+  → sauvegarde initialisation_cuves
+  → met à jour cuves (stock_actuel_litres, jauge_actuelle_cm, cmup)
+  → crée/met à jour les A Nouveau des comptes stock carburant :
+    310 Stock Essence (SP95/SP91)
+    320 Stock Gasoil
+    330 Stock Pétrole lampant
+  (agrégation par compte_stock de la cuve)
 
 Onglet Stock Boutique :
 
-Quantités + Prix d'achat initial par article → Valorisation CMUP de départ
+Quantités + Prix d'achat initial par article
+Valeur = Quantité × Prix d'achat initial
+Enregistrer :
+  → sauvegarde initialisation_stocks_boutique
+  → crée/met à jour les mouvements stock initiaux (entree_initiale) par article
+  → crée/met à jour les A Nouveau des comptes :
+    340 Stock Lubrifiants
+    350 Stock GPL
+    360 Stock Marchandises générales
+    370 Stock Pièces et accessoires autos
+  (agrégation par famille d'article)
 
 Éléments communs à l'entreprise
 
-Onglet Immobilisations (classes 2)
-Onglet Tiers (soldes fournisseurs, clients, employés)
-Onglet Trésorerie (soldes de chaque compte)
-Onglet Autres dettes (LT, fiscales, sociales, associés)
+Onglet Immobilisations (classes 2) :
+Enregistrer → A Nouveau par compte d'immobilisation (solde débiteur)
+
+Onglet Tiers — Créances (411, 460) :
+Enregistrer → A Nouveau par créance (solde débiteur)
+
+Onglet Dettes — Fournisseurs et autres (401, dettes LT/fiscales/sociales) :
+Enregistrer → A Nouveau par dette (solde créditeur)
+
+Onglet Trésorerie (512, 513, 514, 530) :
+Enregistrer → A Nouveau par compte de trésorerie (solde débiteur)
+
+Synthèse bilan d'ouverture (panneau latéral) :
+
+Mise à jour en temps réel après chaque Enregistrer
+Capital Net = Total Actif − Total Passif
+Les A Nouveau alimentent le Grand Livre ; la synthèse reflète les données enregistrées
 
 
 10. PAGE TRAITEMENT
@@ -450,11 +533,14 @@ Le solde n'est pas forcément nul (solde global fournisseur partenaire)
 
 Onglet 3 — Réception :
 
-Sélection camion + compartiments concernés par station
-Jauge avant dépotage (cm) → Volume via calibrage
-Jauge après dépotage (cm) → Volume via calibrage
-Écart livraison = (Jauge après − Jauge avant) − Volume nominal compartiment → indicatif
-Quantité facturée = volume nominal compartiment (pas la quantité constatée)
+Sélection camion + N° BL + date livraison
+Affectation par compartiment : produit, volume nominal, station destinataire, cuve destinataire
+La jauge se mesure sur la cuve (pas sur le compartiment camion)
+Regroupement automatique : plusieurs compartiments peuvent alimenter la même cuve
+Pour chaque cuve concernée : une seule jauge avant et une seule jauge après dépotage
+Volume avant/après via get_volume_from_jauge() sur la cuve
+Écart indicatif cuve = (Volume après − Volume avant) − Total nominal livré (Σ compartiments vers cette cuve)
+Stock, facture et comptabilité = total nominal livré par compartiment (la jauge est un contrôle visuel uniquement)
 
 Onglet 4 — BL/Facture (récapitulatif) :
 
@@ -804,7 +890,7 @@ Stock boutique : mis à jour en temps réel à chaque vente
 Comptabilisation boutique : groupée à la clôture shift
 Prix carburant historisé : changement = nouvel enregistrement daté, passé conservé
 Mouvementer avant Comptabiliser : bouton Comptabiliser grisé sans mouventation préalable
-Valider Initialisation : irréversible, verrouille définitivement la page
+Valider Initialisation : irréversible, verrouille définitivement la page — ne génère ni écritures ni mouvements stock (les A Nouveau sont créés à chaque Enregistrer d'onglet)
 Facture boutique non-partenaire : soldée à 0 obligatoirement
 460 Responsabilité opérationnelle : tout écart non justifié → 460-xxx de l'employé auto
 Partenaire : jamais de données financières (CA carburant, marges, trésorerie, comptabilité)
@@ -821,7 +907,7 @@ Toute logique métier critique en SQL (fonctions, triggers) — pas en JavaScrip
 Transactions obligatoires pour opérations multi-tables (ACID)
 RLS strict sur toutes les tables sensibles
 Erreurs RLS anticipées et corrigées avant déploiement
-Fonctions SQL clés : get_volume_from_jauge(), calculer_cmup(), verifier_partie_double(), generer_numero_tiers(), generer_numero_tresorerie()
+Fonctions SQL clés : get_volume_from_jauge(), calculer_cmup(), verifier_partie_double(), generer_numero_tiers(), generer_numero_tresorerie(), sync_initialisation_a_nouveau(), get_initialisation_bilan_ouverture(), valider_initialisation_lock()
 
 
 16. TESTS — OBLIGATOIRES

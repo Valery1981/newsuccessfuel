@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "supabase-successfuel": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=uetkdbpmqxdnnnwkyzzi&read_only=true"
+    }
+  }
+}

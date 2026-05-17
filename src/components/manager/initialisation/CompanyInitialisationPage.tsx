@@ -1,14 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle, CircleHelp, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { EcriturePreview } from "@/components/compta/EcriturePreview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,8 +30,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { assertCompteUsage } from "@/lib/comptabilite/compteMetadata";
+import {
+  aggregateBoutiqueParCompteStock,
+  aggregateCuvesParCompteStock,
+  calculerValeurStock,
+  comptesToLignesANouveau,
+  type InitialisationModule,
+} from "@/lib/initialisationCompta";
+import {
+  getCuveDisplayVolume,
+  mapStagingBoutiqueToState,
+  mapStagingComptesToState,
+  mapStagingCuvesToState,
+  mapStagingPistoletsToState,
+} from "@/lib/initialisationHydration";
 import { formatCurrency, interpolateVolume } from "@/lib/utils";
 import { cuveService } from "@/services/cuveService";
+import { initialisationEcrituresService } from "@/services/initialisationEcrituresService";
 import { initialisationService } from "@/services/initialisationService";
 import { pistoletService } from "@/services/pistoletService";
 import { stationService } from "@/services/stationService";
@@ -68,17 +88,23 @@ interface FixedAssetAccount {
   label: string;
 }
 
+interface DetteCompteAccount {
+  account_id: string;
+  label: string;
+}
+
 export interface AccountsBundle {
   treasury: TreasuryAccount[];
   receivable: TiersAccount[];
   payable: TiersAccount[];
+  dettes_comptes: DetteCompteAccount[];
   fixed_assets: FixedAssetAccount[];
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
-const fmt = (n: number) =>
-  n.toLocaleString("fr-MG", {
+const fmt = (n: number | null | undefined) =>
+  (Number(n) || 0).toLocaleString("fr-MG", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -87,6 +113,44 @@ const parseAmt = (s: string): number => {
   const n = parseFloat(s.replace(",", "."));
   return isNaN(n) || n < 0 ? 0 : n;
 };
+
+const INIT_PERIMETRE_HELP =
+  "Cuves, index pistolets et stock boutique : par station. Trésorerie, créances, dettes et immobilisations : niveau entreprise (écritures centralisées, sans station).";
+
+function BilanSynthèseLigne({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="flex justify-between items-baseline gap-4 py-1 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono tabular-nums text-foreground shrink-0">
+        {fmt(value)}
+      </span>
+    </div>
+  );
+}
+
+function BilanSynthèseBloc({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div>
+        <p className="text-[11px] font-medium tracking-wide text-muted-foreground">
+          {title}
+        </p>
+        {note ? (
+          <p className="text-[10px] text-muted-foreground/70 mt-0.5">{note}</p>
+        ) : null}
+      </div>
+      <div className="space-y-0 pl-2.5 border-l border-border/50">{children}</div>
+    </div>
+  );
+}
 
 export function CompanyInitialisationPage() {
   const { entreprise, compte } = useAuthStore();
@@ -98,6 +162,9 @@ export function CompanyInitialisationPage() {
   const [boutiqueStocks, setBoutiqueStocks] = useState<
     Record<string, { qty: string; value: number }>
   >({});
+  const [boutiquePrixAchat, setBoutiquePrixAchat] = useState<
+    Record<string, string>
+  >({});
   const [tresorerieSoldes, setTresorerieSoldes] = useState<
     Record<string, string>
   >({});
@@ -105,6 +172,9 @@ export function CompanyInitialisationPage() {
     {},
   );
   const [dettesSoldes, setDettesSoldes] = useState<Record<string, string>>({});
+  const [dettesComptesSoldes, setDettesComptesSoldes] = useState<
+    Record<string, string>
+  >({});
   const [immobilisations, setImmobilisations] = useState<
     Record<string, string>
   >({});
@@ -123,7 +193,7 @@ export function CompanyInitialisationPage() {
     queryKey: ["boutique-init", selectedStation, entreprise?.id],
     queryFn: () =>
       selectedStation && entreprise
-        ? initialisationService.getBoutiqueInitItems(selectedStation)
+        ? initialisationService.getBoutiqueInitItems(entreprise.id)
         : [],
     enabled: !!selectedStation && !!entreprise?.id,
   });
@@ -139,13 +209,6 @@ export function CompanyInitialisationPage() {
     enabled: !!entreprise?.id,
   });
 
-  const { data: openingBalanceSummary } = useQuery({
-    queryKey: ["opening-balance-summary", entreprise?.id],
-    queryFn: () =>
-      entreprise ? initialisationService.getOpeningBalanceSummary() : null,
-    enabled: !!entreprise?.id,
-  });
-
   const { data: initialisation, isLoading } =
     useQuery<InitialisationRow | null>({
       queryKey: ["initialisation", entreprise?.id],
@@ -155,6 +218,24 @@ export function CompanyInitialisationPage() {
           : null,
       enabled: !!entreprise?.id,
     });
+
+  const { data: initStaging } = useQuery({
+    queryKey: ["initialisation-staging", initialisation?.id],
+    queryFn: () =>
+      initialisation
+        ? initialisationService.getInitialisationData(initialisation.id)
+        : null,
+    enabled: !!initialisation?.id,
+  });
+
+  const { data: openingBalanceSummary } = useQuery({
+    queryKey: ["opening-balance-summary", initialisation?.id],
+    queryFn: () =>
+      initialisation
+        ? initialisationService.getBilanOuverture(initialisation.id)
+        : null,
+    enabled: !!initialisation?.id,
+  });
 
   const { data: stations } = useQuery<StationRow[]>({
     queryKey: ["stations", entreprise?.id],
@@ -178,25 +259,94 @@ export function CompanyInitialisationPage() {
     enabled: !!selectedStation,
   });
 
+  const invalidateStaging = () => {
+    queryClient.invalidateQueries({ queryKey: ["initialisation-staging"] });
+  };
+
+  /** Comptes entreprise : rechargés depuis initialisation_comptes. */
+  useEffect(() => {
+    if (!initStaging?.comptes) return;
+    const mapped = mapStagingComptesToState(initStaging.comptes);
+    setTresorerieSoldes(mapped.tresorerieSoldes);
+    setCreancesSoldes(mapped.creancesSoldes);
+    setDettesSoldes(mapped.dettesSoldes);
+    setDettesComptesSoldes(mapped.dettesComptesSoldes);
+    setImmobilisations(mapped.immobilisations);
+  }, [initStaging]);
+
+  /** Données station : cuves, pistolets, stock boutique. */
+  useEffect(() => {
+    if (!initStaging || !selectedStation) return;
+    setCuveJauges(mapStagingCuvesToState(initStaging.cuves, selectedStation));
+    setPistoletIndexes(
+      mapStagingPistoletsToState(initStaging.pistolets, selectedStation),
+    );
+    const boutique = mapStagingBoutiqueToState(
+      initStaging.stocks,
+      selectedStation,
+    );
+    setBoutiqueStocks(boutique.stocks);
+    setBoutiquePrixAchat(boutique.prixAchat);
+  }, [initStaging, selectedStation]);
+
+  /** CMUP initial par défaut (prix carburant) uniquement si pas encore enregistré. */
+  useEffect(() => {
+    if (!selectedStation || !(cuves ?? []).length || !initStaging) return;
+    let cancelled = false;
+    (async () => {
+      const savedCuveIds = new Set(
+        initStaging.cuves
+          .filter((r) => r.station_id === selectedStation && r.cuve_id)
+          .map((r) => r.cuve_id as string),
+      );
+      const updates: Record<string, string> = {};
+      for (const c of cuves ?? []) {
+        if (savedCuveIds.has(c.id)) continue;
+        const pa = await initialisationEcrituresService.getPrixAchatCourant(
+          selectedStation,
+          c.type_carburant,
+          c.type_carburant_id ?? null,
+        );
+        if (pa > 0) updates[c.id] = String(pa);
+      }
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setCuveJauges((prev) => {
+          const next = { ...prev };
+          for (const [id, pa] of Object.entries(updates)) {
+            if (!next[id]?.prix_achat) {
+              next[id] = {
+                jauge_cm: next[id]?.jauge_cm ?? "",
+                volume_litres: next[id]?.volume_litres ?? "",
+                prix_achat: pa,
+              };
+            }
+          }
+          return next;
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedStation, cuves, initStaging]);
+
   // ── Computed totals ───────────────────────────────────────────────────
   const computedTotals = useMemo(() => {
     // APEX 2026-05-15-02 : volume calculé depuis la jauge via calibrages (Guide §10.2)
     const cuveTotal = (cuves ?? []).reduce((sum, c) => {
       const data = cuveJauges[c.id];
       if (!data) return sum;
-      const jauge = Number(data.jauge_cm) || 0;
-      const calibrages = c.calibrages ?? [];
-      const volume =
-        calibrages.length > 0 && jauge > 0
-          ? interpolateVolume(calibrages, jauge)
-          : 0;
-      return sum + volume * (Number(data.prix_achat) || 0);
+      const volume = getCuveDisplayVolume(c.calibrages ?? [], data);
+      const cmup = Number(data.prix_achat) || 0;
+      return sum + calculerValeurStock(volume, cmup);
     }, 0);
 
     const boutiqueTotal = (boutiqueItems ?? []).reduce((sum, b) => {
       const data = boutiqueStocks[b.product_id];
       if (!data) return sum;
-      return sum + data.value;
+      const pa =
+        parseAmt(boutiquePrixAchat[b.product_id] ?? "") || b.purchase_price || 0;
+      return sum + calculerValeurStock(Number(data.qty) || 0, pa);
     }, 0);
 
     const tresorerieTotal = Object.values(tresorerieSoldes).reduce(
@@ -207,10 +357,12 @@ export function CompanyInitialisationPage() {
       (sum, v) => sum + parseAmt(v),
       0,
     );
-    const dettesTotal = Object.values(dettesSoldes).reduce(
-      (sum, v) => sum + parseAmt(v),
-      0,
-    );
+    const dettesTotal =
+      Object.values(dettesSoldes).reduce((sum, v) => sum + parseAmt(v), 0) +
+      Object.values(dettesComptesSoldes).reduce(
+        (sum, v) => sum + parseAmt(v),
+        0,
+      );
     const immobilisationsTotal = Object.values(immobilisations).reduce(
       (sum, v) => sum + parseAmt(v),
       0,
@@ -244,23 +396,69 @@ export function CompanyInitialisationPage() {
     tresorerieSoldes,
     creancesSoldes,
     dettesSoldes,
+    dettesComptesSoldes,
     immobilisations,
+    boutiquePrixAchat,
   ]);
 
-  const summary = openingBalanceSummary || computedTotals;
+  const summary = useMemo(() => {
+    const base = openingBalanceSummary ?? computedTotals;
+    return {
+      fuel: base.fuel ?? 0,
+      boutique: base.boutique ?? 0,
+      treasury: base.treasury ?? 0,
+      receivable: base.receivable ?? 0,
+      payable: base.payable ?? 0,
+      asset: base.asset ?? 0,
+      totalActif: base.totalActif ?? 0,
+      totalPassif: base.totalPassif ?? 0,
+      capitalNet: base.capitalNet ?? 0,
+    };
+  }, [openingBalanceSummary, computedTotals]);
+
+  const dateOuverture =
+    initialisation?.date_ouverture ??
+    new Date().toISOString().split("T")[0];
+
+  const invalidateBilan = () => {
+    invalidateStaging();
+    queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    queryClient.invalidateQueries({ queryKey: ["report-grand-livre"] });
+    queryClient.invalidateQueries({ queryKey: ["report-balance"] });
+  };
+
+  const syncModuleANouveau = async (
+    module: InitialisationModule,
+    stationId: string | null,
+    lignes: ReturnType<typeof comptesToLignesANouveau>,
+  ) => {
+    if (!initialisation || !entreprise) throw new Error("Session invalide");
+    const count = await initialisationEcrituresService.syncANouveau({
+      initialisationId: initialisation.id,
+      entrepriseId: entreprise.id,
+      module,
+      stationId,
+      dateOuverture,
+      createdBy: compte?.session_id ?? null,
+      lignes,
+    });
+    return count;
+  };
 
   const validationMutation = useMutation({
     mutationFn: () => {
-      if (!initialisation || !compte) throw new Error("Session invalide");
+      if (!initialisation || !compte || !entreprise)
+        throw new Error("Session invalide");
       return initialisationService.validerInitialisation(
         initialisation.id,
+        entreprise.id,
         compte.id,
       );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["initialisation"] });
       toast.success(
-        "Initialisation validée ! Vous pouvez commencer à utiliser l'application.",
+        "Initialisation verrouillée. Les A Nouveau enregistrés restent dans le Grand Livre.",
       );
       setConfirmValidate(false);
     },
@@ -272,56 +470,146 @@ export function CompanyInitialisationPage() {
 
   const saveCuvesMutation = useMutation({
     mutationFn: async () => {
-      if (!initialisation) throw new Error("Session invalide");
-      // APEX 2026-05-15-02 : volume calculé depuis la jauge via calibrages (Guide §10.2 ligne 418)
-      const entries = (cuves ?? [])
-        .filter((c) => cuveJauges[c.id])
-        .map((c) => {
-          const jauge = Number(cuveJauges[c.id].jauge_cm);
+      if (!initialisation || !entreprise || !selectedStation)
+        throw new Error("Session invalide");
+      const entries: Array<{
+        cuve_id: string;
+        station_id: string;
+        jauge_initiale_cm: number;
+        volume_initial_litres: number;
+        prix_achat_initial: number;
+        compte_stock: string;
+        valeur: number;
+      }> = [];
+
+      for (const c of cuves ?? []) {
+        const data = cuveJauges[c.id];
+        if (!data) continue;
+        const jauge = Number(data.jauge_cm) || 0;
+        if (jauge <= 0) continue;
+
+        let volume = 0;
+        try {
+          volume = await cuveService.getVolumeFromJauge(c.id, jauge);
+        } catch {
           const calibrages = c.calibrages ?? [];
-          const volume =
-            calibrages.length > 0 && jauge > 0
+          volume =
+            calibrages.length > 0
               ? interpolateVolume(calibrages, jauge)
               : 0;
-          return {
-            cuve_id: c.id,
-            station_id: selectedStation,
-            jauge_initiale_cm: jauge,
-            volume_initial_litres: volume,
-            prix_achat_initial: Number(cuveJauges[c.id].prix_achat),
-          };
+        }
+
+        const prixAchat =
+          Number(data.prix_achat) > 0
+            ? Number(data.prix_achat)
+            : await initialisationEcrituresService.getPrixAchatCourant(
+                selectedStation,
+                c.type_carburant,
+                c.type_carburant_id ?? null,
+              );
+
+        const valeur = calculerValeurStock(volume, prixAchat);
+        if (valeur <= 0) continue;
+
+        entries.push({
+          cuve_id: c.id,
+          station_id: selectedStation,
+          jauge_initiale_cm: jauge,
+          volume_initial_litres: volume,
+          prix_achat_initial: prixAchat,
+          compte_stock: c.compte_stock ?? "310",
+          valeur,
         });
+      }
+
       await initialisationService.saveInitialisationCuves(
         initialisation.id,
-        entries,
+        selectedStation,
+        entries.map(
+          ({ compte_stock: _cs, valeur: _v, ...row }) => row,
+        ),
       );
+
+      await initialisationEcrituresService.syncCuvesStock(
+        initialisation.id,
+        selectedStation,
+        entreprise.id,
+      );
+
+      const lignes = aggregateCuvesParCompteStock(
+        entries.map((e) => ({
+          compte_stock: e.compte_stock,
+          valeur: e.valeur,
+        })),
+      );
+      const count = await syncModuleANouveau("cuves", selectedStation, lignes);
+      return count;
     },
-    onSuccess: () => {
-      toast.success("Cuves enregistrées");
-      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    onSuccess: (count) => {
+      toast.success(
+        `Cuves enregistrées — ${count ?? 0} écriture(s) A Nouveau dans le Grand Livre`,
+      );
+      invalidateBilan();
     },
     onError: (error) => toast.error(error.message),
   });
 
   const saveBoutiqueMutation = useMutation({
     mutationFn: async () => {
-      if (!initialisation) throw new Error("Session invalide");
-      const entries = (boutiqueItems ?? [])
-        .filter((b) => boutiqueStocks[b.product_id])
-        .map((b) => ({
+      if (!initialisation || !entreprise || !selectedStation)
+        throw new Error("Session invalide");
+      const staging: Array<{
+        article_id: string;
+        station_id: string;
+        quantite_initiale: number;
+        prix_achat_initial: number;
+        famille: string;
+        valeur: number;
+      }> = [];
+
+      for (const b of boutiqueItems ?? []) {
+        const stock = boutiqueStocks[b.product_id];
+        if (!stock) continue;
+        const qty = Number(stock.qty) || 0;
+        const pa =
+          parseAmt(boutiquePrixAchat[b.product_id] ?? "") ||
+          b.purchase_price ||
+          0;
+        const valeur = calculerValeurStock(qty, pa);
+        if (valeur <= 0) continue;
+        staging.push({
           article_id: b.product_id,
           station_id: selectedStation,
-          quantite_initiale: Number(boutiqueStocks[b.product_id].qty),
-          prix_achat_initial: b.purchase_price,
-        }));
+          quantite_initiale: qty,
+          prix_achat_initial: pa,
+          famille: b.family_name,
+          valeur,
+        });
+      }
+
       await initialisationService.saveInitialisationStocksBoutique(
         initialisation.id,
-        entries,
+        selectedStation,
+        staging.map(({ famille: _f, valeur: _v, ...row }) => row),
       );
+
+      await initialisationEcrituresService.syncStockBoutique(
+        initialisation.id,
+        selectedStation,
+        entreprise.id,
+        compte?.session_id ?? null,
+      );
+
+      const lignes = aggregateBoutiqueParCompteStock(
+        staging.map((s) => ({ famille: s.famille, valeur: s.valeur })),
+      );
+      return syncModuleANouveau("stock_boutique", selectedStation, lignes);
     },
-    onSuccess: () => {
-      toast.success("Stock boutique enregistré");
-      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    onSuccess: (count) => {
+      toast.success(
+        `Stock boutique enregistré — ${count ?? 0} écriture(s) A Nouveau`,
+      );
+      invalidateBilan();
     },
     onError: (error) => toast.error(error.message),
   });
@@ -336,7 +624,7 @@ export function CompanyInitialisationPage() {
         libelle_compte: string;
         solde_debit: number;
         solde_credit: number;
-        onglet: "tresorerie" | "tiers" | "immobilisations";
+        onglet: "tresorerie" | "tiers" | "immobilisations" | "autres_dettes";
         tresorerie_id?: string;
         tiers_id?: string;
       }[] = [];
@@ -345,6 +633,7 @@ export function CompanyInitialisationPage() {
         accountsBundle.treasury.forEach((t) => {
           const solde = tresorerieSoldes[t.id];
           if (solde) {
+            assertCompteUsage(t.numero_compte, "INITIALISATION_TRESORERIE");
             entries.push({
               numero_compte: t.numero_compte,
               libelle_compte: t.libelle,
@@ -361,6 +650,7 @@ export function CompanyInitialisationPage() {
         accountsBundle.receivable.forEach((r) => {
           const solde = creancesSoldes[r.id];
           if (solde) {
+            assertCompteUsage(r.account_id, "INITIALISATION_CREANCE");
             entries.push({
               numero_compte: r.account_id,
               libelle_compte: r.label,
@@ -373,10 +663,11 @@ export function CompanyInitialisationPage() {
         });
       }
 
-      if (onglet === "dettes" && accountsBundle?.payable) {
+      if (onglet === "dettes" && accountsBundle) {
         accountsBundle.payable.forEach((p) => {
           const solde = dettesSoldes[p.id];
           if (solde) {
+            assertCompteUsage(p.account_id, "INITIALISATION_DETTE");
             entries.push({
               numero_compte: p.account_id,
               libelle_compte: p.label,
@@ -387,12 +678,26 @@ export function CompanyInitialisationPage() {
             });
           }
         });
+        accountsBundle.dettes_comptes.forEach((c) => {
+          const solde = dettesComptesSoldes[c.account_id];
+          if (solde) {
+            assertCompteUsage(c.account_id, "INITIALISATION_DETTE");
+            entries.push({
+              numero_compte: c.account_id,
+              libelle_compte: c.label,
+              solde_debit: 0,
+              solde_credit: Number(solde),
+              onglet: "autres_dettes",
+            });
+          }
+        });
       }
 
       if (onglet === "immobilisations" && accountsBundle?.fixed_assets) {
         accountsBundle.fixed_assets.forEach((a) => {
           const valeur = immobilisations[a.account_id];
           if (valeur) {
+            assertCompteUsage(a.account_id, "INITIALISATION_IMMOBILISATION");
             entries.push({
               numero_compte: a.account_id,
               libelle_compte: a.label,
@@ -406,19 +711,36 @@ export function CompanyInitialisationPage() {
 
       await initialisationService.saveInitialisationComptes(
         initialisation.id,
+        onglet,
         entries,
       );
+
+      const moduleMap: Record<
+        "tresorerie" | "creances" | "dettes" | "immobilisations",
+        InitialisationModule
+      > = {
+        tresorerie: "tresorerie",
+        creances: "creances",
+        dettes: "dettes",
+        immobilisations: "immobilisations",
+      };
+
+      const lignes = comptesToLignesANouveau(entries);
+      return syncModuleANouveau(moduleMap[onglet], null, lignes);
     },
-    onSuccess: () => {
-      toast.success("Comptes enregistrés");
-      queryClient.invalidateQueries({ queryKey: ["opening-balance-summary"] });
+    onSuccess: (count) => {
+      toast.success(
+        `Comptes enregistrés — ${count ?? 0} écriture(s) A Nouveau`,
+      );
+      invalidateBilan();
     },
     onError: (error) => toast.error(error.message),
   });
 
   const savePistoletsMutation = useMutation({
     mutationFn: async () => {
-      if (!initialisation) throw new Error("Session invalide");
+      if (!initialisation || !entreprise || !selectedStation)
+        throw new Error("Session invalide");
       const entries = (pistolets ?? [])
         .filter((p) => pistoletIndexes[p.id])
         .map((p) => ({
@@ -428,10 +750,19 @@ export function CompanyInitialisationPage() {
         }));
       await initialisationService.saveInitialisationIndexPistolets(
         initialisation.id,
+        selectedStation,
         entries,
       );
+      await initialisationEcrituresService.syncIndexPistolets(
+        initialisation.id,
+        selectedStation,
+        entreprise.id,
+      );
     },
-    onSuccess: () => toast.success("Index pistolets enregistrés"),
+    onSuccess: () => {
+      toast.success("Index pistolets enregistrés (opérationnel, sans écriture)");
+      invalidateStaging();
+    },
     onError: (error) => toast.error(error.message),
   });
 
@@ -463,7 +794,7 @@ export function CompanyInitialisationPage() {
     <PageContainer>
       <PageHeader
         title="Initialisation"
-        description="Saisissez les données de départ de votre entreprise (opération irréversible)"
+        description="Chaque Enregistrer met à jour le bilan d'ouverture et le Grand Livre. La validation verrouille définitivement."
         actions={
           <Button
             onClick={() => setConfirmValidate(true)}
@@ -479,50 +810,105 @@ export function CompanyInitialisationPage() {
         <AlertTriangle className="h-4 w-4 text-amber-500" />
         <AlertTitle>Action irréversible</AlertTitle>
         <AlertDescription>
-          La validation de l&apos;initialisation est irréversible. Elle génère
-          les A Nouveau comptables, les entrées de stock initiales et le Capital
-          Net. Vérifiez bien toutes les données avant de valider.
+          Les A Nouveau sont créés à chaque clic sur Enregistrer (onglet par
+          onglet). La validation verrouille uniquement l&apos;initialisation —
+          aucune nouvelle écriture ni mouvement de stock ne sera généré à ce
+          moment.
         </AlertDescription>
       </Alert>
 
       {/* Station selector */}
       <Card>
-        <CardContent className="pt-4">
-          <div className="flex items-center gap-4">
-            <Label>Station :</Label>
-            <Select
-              value={selectedStation}
-              onValueChange={(val) => setSelectedStation(val ?? "")}
+        <CardContent className="flex items-center gap-3 pt-4">
+          <Label className="shrink-0">Station :</Label>
+          <Select
+            value={selectedStation}
+            onValueChange={(val) => setSelectedStation(val ?? "")}
+          >
+            <SelectTrigger className="w-64 max-w-full">
+              <SelectValue placeholder="Sélectionner une station">
+                {(stations ?? []).find((s) => s.id === selectedStation)?.nom}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(stations ?? []).map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Tooltip>
+            <TooltipTrigger
+              type="button"
+              className="inline-flex shrink-0 rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label="Aide périmètre station / entreprise"
             >
-              <SelectTrigger className="w-64">
-                <SelectValue placeholder="Sélectionner une station">
-                  {(stations ?? []).find((s) => s.id === selectedStation)?.nom}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(stations ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.nom}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              <CircleHelp className="h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              align="end"
+              className="max-w-[280px] text-left leading-snug"
+            >
+              {INIT_PERIMETRE_HELP}
+            </TooltipContent>
+          </Tooltip>
         </CardContent>
       </Card>
 
       {/* APEX 2026-05-15-02 : layout 2 colonnes — droite Tabs, gauche Synthèse sticky (Guide §9) */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6">
         <div className="order-2 lg:order-1 min-w-0">
-          <Tabs defaultValue="cuves">
-            <TabsList className="flex-wrap">
-              <TabsTrigger value="cuves">Cuves</TabsTrigger>
-              <TabsTrigger value="pistolets">Index Pistolets</TabsTrigger>
-              <TabsTrigger value="stock-boutique">Stock Boutique</TabsTrigger>
-              <TabsTrigger value="tresorerie">Trésorerie</TabsTrigger>
-              <TabsTrigger value="tiers">Créances</TabsTrigger>
-              <TabsTrigger value="dettes">Dettes</TabsTrigger>
-              <TabsTrigger value="immobilisations">Immobilisations</TabsTrigger>
+          <Tabs defaultValue="pistolets">
+            <TabsList className="mb-4 flex h-auto w-full max-w-full flex-col items-stretch gap-2.5 p-2">
+              <div className="min-w-0 w-full">
+                <p className="mb-1 px-0.5 text-[11px] font-medium text-muted-foreground">
+                  Informations station
+                </p>
+                <div className="flex h-8 w-full max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto rounded-md bg-background/50 p-[3px]">
+                  <TabsTrigger
+                    value="pistolets"
+                    className="shrink-0 flex-none px-3"
+                  >
+                    Index pistolets
+                  </TabsTrigger>
+                  <TabsTrigger value="cuves" className="shrink-0 flex-none px-3">
+                    Cuves
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="stock-boutique"
+                    className="shrink-0 flex-none px-3"
+                  >
+                    Stock boutique
+                  </TabsTrigger>
+                </div>
+              </div>
+              <div className="min-w-0 w-full">
+                <p className="mb-1 px-0.5 text-[11px] font-medium text-muted-foreground">
+                  Informations entreprise
+                </p>
+                <div className="flex h-8 w-full max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto rounded-md bg-background/50 p-[3px]">
+                  <TabsTrigger
+                    value="tresorerie"
+                    className="shrink-0 flex-none px-3"
+                  >
+                    Trésorerie
+                  </TabsTrigger>
+                  <TabsTrigger value="tiers" className="shrink-0 flex-none px-3">
+                    Créances
+                  </TabsTrigger>
+                  <TabsTrigger value="dettes" className="shrink-0 flex-none px-3">
+                    Dettes
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="immobilisations"
+                    className="shrink-0 flex-none px-3"
+                  >
+                    Immobilisations
+                  </TabsTrigger>
+                </div>
+              </div>
             </TabsList>
 
             {/* Tab Cuves */}
@@ -548,7 +934,7 @@ export function CompanyInitialisationPage() {
                               {cuve.nom} ({cuve.type_carburant})
                             </Badge>
                           </div>
-                          <div className="sm:col-span-2 grid grid-cols-3 gap-3">
+                          <div className="sm:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="space-y-1">
                               <Label className="text-xs">Jauge (cm)</Label>
                               <Input
@@ -558,43 +944,49 @@ export function CompanyInitialisationPage() {
                                   setCuveJauges((prev) => ({
                                     ...prev,
                                     [cuve.id]: {
-                                      ...prev[cuve.id],
                                       jauge_cm: e.target.value,
+                                      volume_litres:
+                                        prev[cuve.id]?.volume_litres ?? "",
+                                      prix_achat:
+                                        prev[cuve.id]?.prix_achat ?? "",
                                     },
                                   }))
                                 }
                                 placeholder="0"
                                 min={0}
                                 max={300}
+                                disabled={!!initialisation?.est_validee}
                               />
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">
-                                Volume (L) — calculé
+                                Volume initial (L)
                               </Label>
-                              {/* APEX 2026-05-15-02 : volume auto-calculé via calibrages (Guide §10.2 ligne 418) */}
                               <div className="h-9 px-3 flex items-center rounded-md border bg-muted text-sm font-mono">
                                 {(() => {
-                                  const jauge = parseFloat(
-                                    cuveJauges[cuve.id]?.jauge_cm ?? "",
-                                  );
-                                  if (!jauge || jauge <= 0) return "—";
+                                  const data = cuveJauges[cuve.id];
+                                  const jauge = Number(data?.jauge_cm) || 0;
+                                  if (jauge <= 0) return "—";
                                   if (
                                     !cuve.calibrages ||
                                     cuve.calibrages.length === 0
-                                  )
-                                    return "Cuve non calibrée";
-                                  const v = interpolateVolume(
+                                  ) {
+                                    const saved = Number(data?.volume_litres);
+                                    return saved > 0
+                                      ? `${saved.toLocaleString("fr-FR")} L`
+                                      : "Cuve non calibrée";
+                                  }
+                                  const v = getCuveDisplayVolume(
                                     cuve.calibrages,
-                                    jauge,
+                                    data,
                                   );
-                                  return v.toLocaleString("fr-FR") + " L";
+                                  return `${v.toLocaleString("fr-FR")} L`;
                                 })()}
                               </div>
                             </div>
                             <div className="space-y-1">
                               <Label className="text-xs">
-                                Prix achat (MGA/L)
+                                CMUP initial (Ar/L)
                               </Label>
                               <Input
                                 type="number"
@@ -603,13 +995,35 @@ export function CompanyInitialisationPage() {
                                   setCuveJauges((prev) => ({
                                     ...prev,
                                     [cuve.id]: {
-                                      ...prev[cuve.id],
+                                      jauge_cm: prev[cuve.id]?.jauge_cm ?? "",
+                                      volume_litres:
+                                        prev[cuve.id]?.volume_litres ?? "",
                                       prix_achat: e.target.value,
                                     },
                                   }))
                                 }
-                                placeholder="0"
+                                placeholder="Depuis prix carburant"
+                                disabled={!!initialisation?.est_validee}
                               />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs font-medium">
+                                Valeur stock initial
+                              </Label>
+                              <div className="h-9 px-3 flex items-center rounded-md border border-or/40 bg-or/5 text-sm font-mono font-semibold">
+                                {(() => {
+                                  const data = cuveJauges[cuve.id];
+                                  const volume = getCuveDisplayVolume(
+                                    cuve.calibrages ?? [],
+                                    data,
+                                  );
+                                  const cmup = Number(data?.prix_achat) || 0;
+                                  if (volume <= 0 || cmup <= 0) return "—";
+                                  return formatCurrency(
+                                    calculerValeurStock(volume, cmup),
+                                  );
+                                })()}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -712,9 +1126,31 @@ export function CompanyInitialisationPage() {
                             <Label className="text-xs">Prix achat (MGA)</Label>
                             <Input
                               type="number"
-                              value={item.purchase_price}
-                              disabled
-                              className="bg-muted"
+                              value={
+                                boutiquePrixAchat[item.product_id] ??
+                                String(item.purchase_price || "")
+                              }
+                              onChange={(e) => {
+                                const pa = e.target.value;
+                                setBoutiquePrixAchat((prev) => ({
+                                  ...prev,
+                                  [item.product_id]: pa,
+                                }));
+                                const qty =
+                                  boutiqueStocks[item.product_id]?.qty ?? "0";
+                                setBoutiqueStocks((prev) => ({
+                                  ...prev,
+                                  [item.product_id]: {
+                                    qty,
+                                    value: calculerValeurStock(
+                                      parseAmt(qty),
+                                      parseAmt(pa),
+                                    ),
+                                  },
+                                }));
+                              }}
+                              placeholder="0"
+                              min={0}
                             />
                           </div>
                           <div className="space-y-1">
@@ -724,11 +1160,19 @@ export function CompanyInitialisationPage() {
                               value={boutiqueStocks[item.product_id]?.qty || ""}
                               onChange={(e) => {
                                 const qty = e.target.value;
-                                const value =
-                                  parseAmt(qty) * item.purchase_price;
+                                const pa =
+                                  parseAmt(
+                                    boutiquePrixAchat[item.product_id] ?? "",
+                                  ) || item.purchase_price;
                                 setBoutiqueStocks((prev) => ({
                                   ...prev,
-                                  [item.product_id]: { qty, value },
+                                  [item.product_id]: {
+                                    qty,
+                                    value: calculerValeurStock(
+                                      parseAmt(qty),
+                                      pa,
+                                    ),
+                                  },
                                 }));
                               }}
                               placeholder="0"
@@ -819,7 +1263,16 @@ export function CompanyInitialisationPage() {
                       l&apos;entreprise (toutes les stations).
                     </p>
                   </div>
-                  {(accountsBundle?.receivable ?? []).map((r: TiersAccount) => (
+                  {(accountsBundle?.receivable ?? []).filter(
+                    (r) => r.type === "client",
+                  ).length > 0 ? (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Clients (411)
+                    </p>
+                  ) : null}
+                  {(accountsBundle?.receivable ?? [])
+                    .filter((r) => r.type === "client")
+                    .map((r: TiersAccount) => (
                     <div
                       key={r.id}
                       className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
@@ -827,7 +1280,46 @@ export function CompanyInitialisationPage() {
                       <div className="sm:col-span-2">
                         <p className="font-medium">{r.label}</p>
                         <p className="text-sm text-muted-foreground">
-                          Compte: {r.account_id} · Type: {r.type}
+                          Compte: {r.account_id}
+                        </p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">
+                          Solde initial (débit, MGA)
+                        </Label>
+                        <Input
+                          type="number"
+                          value={creancesSoldes[r.id] || ""}
+                          onChange={(e) =>
+                            setCreancesSoldes((prev) => ({
+                              ...prev,
+                              [r.id]: e.target.value,
+                            }))
+                          }
+                          placeholder="0"
+                          min={0}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                  {(accountsBundle?.receivable ?? []).filter(
+                    (r) => r.type === "employe",
+                  ).length > 0 ? (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2">
+                      Employés — responsabilité (460)
+                    </p>
+                  ) : null}
+                  {(accountsBundle?.receivable ?? [])
+                    .filter((r) => r.type === "employe")
+                    .map((r: TiersAccount) => (
+                    <div
+                      key={r.id}
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                    >
+                      <div className="sm:col-span-2">
+                        <p className="font-medium">{r.label}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Compte: {r.account_id}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -875,15 +1367,98 @@ export function CompanyInitialisationPage() {
                       l&apos;entreprise (toutes les stations).
                     </p>
                   </div>
-                  {(accountsBundle?.payable ?? []).map((p: TiersAccount) => (
+                  {(accountsBundle?.payable ?? []).filter(
+                    (p) => p.type === "fournisseur",
+                  ).length > 0 ? (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      Fournisseurs (401)
+                    </p>
+                  ) : null}
+                  {(accountsBundle?.payable ?? [])
+                    .filter((p) => p.type === "fournisseur")
+                    .map((p: TiersAccount) => (
+                      <div
+                        key={p.id}
+                        className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                      >
+                        <div className="sm:col-span-2">
+                          <p className="font-medium">{p.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Compte: {p.account_id}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            Solde initial (crédit, MGA)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={dettesSoldes[p.id] || ""}
+                            onChange={(e) =>
+                              setDettesSoldes((prev) => ({
+                                ...prev,
+                                [p.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="0"
+                            min={0}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  {(accountsBundle?.payable ?? []).filter(
+                    (p) => p.type === "employe",
+                  ).length > 0 ? (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2">
+                      Employés — rémunérations dues (421)
+                    </p>
+                  ) : null}
+                  {(accountsBundle?.payable ?? [])
+                    .filter((p) => p.type === "employe")
+                    .map((p: TiersAccount) => (
+                      <div
+                        key={p.id}
+                        className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
+                      >
+                        <div className="sm:col-span-2">
+                          <p className="font-medium">{p.label}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Compte: {p.account_id}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            Solde initial (crédit, MGA)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={dettesSoldes[p.id] || ""}
+                            onChange={(e) =>
+                              setDettesSoldes((prev) => ({
+                                ...prev,
+                                [p.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="0"
+                            min={0}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  {(accountsBundle?.dettes_comptes ?? []).length > 0 ? (
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide pt-2">
+                      Dettes hors tiers (fiscales, sociales, associés…)
+                    </p>
+                  ) : null}
+                  {(accountsBundle?.dettes_comptes ?? []).map((c) => (
                     <div
-                      key={p.id}
+                      key={c.account_id}
                       className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border rounded-lg"
                     >
                       <div className="sm:col-span-2">
-                        <p className="font-medium">{p.label}</p>
+                        <p className="font-medium">{c.label}</p>
                         <p className="text-sm text-muted-foreground">
-                          Compte: {p.account_id} · Type: {p.type}
+                          Compte: {c.account_id}
                         </p>
                       </div>
                       <div className="space-y-1">
@@ -892,11 +1467,11 @@ export function CompanyInitialisationPage() {
                         </Label>
                         <Input
                           type="number"
-                          value={dettesSoldes[p.id] || ""}
+                          value={dettesComptesSoldes[c.account_id] || ""}
                           onChange={(e) =>
-                            setDettesSoldes((prev) => ({
+                            setDettesComptesSoldes((prev) => ({
                               ...prev,
-                              [p.id]: e.target.value,
+                              [c.account_id]: e.target.value,
                             }))
                           }
                           placeholder="0"
@@ -981,91 +1556,98 @@ export function CompanyInitialisationPage() {
         </div>
         {/* Balance Sheet Summary - Synthèse du bilan d'ouverture (APEX 2026-05-15-02 : colonne gauche sticky) */}
         <aside className="order-1 lg:order-2 lg:sticky lg:top-4 self-start">
-          <Card className="bg-slate-50 border-2 border-slate-200">
-            <CardHeader>
-              <CardTitle className="text-lg font-bold text-slate-800">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold">
                 Synthèse du bilan d&apos;ouverture
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Actif */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+            <CardContent className="space-y-5 text-sm">
+              <section className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-foreground">
                   Actif
                 </p>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Stock carburant (toutes stations)</span>
-                    <span className="font-mono">{fmt(summary.fuel)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Stock boutique (toutes stations)</span>
-                    <span className="font-mono">{fmt(summary.boutique)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Trésoreries (entreprise)</span>
-                    <span className="font-mono">{fmt(summary.treasury)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Créances (entreprise)</span>
-                    <span className="font-mono">{fmt(summary.receivable)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Immobilisations (entreprise)</span>
-                    <span className="font-mono">{fmt(summary.asset)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
-                    <span>= Total Actif</span>
-                    <span className="font-mono">{fmt(summary.totalActif)}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Passif */}
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+                <BilanSynthèseBloc
+                  title="Éléments liés aux stations"
+                  note="Agrégation de toutes les stations"
+                >
+                  <BilanSynthèseLigne
+                    label="Stock carburant"
+                    value={summary.fuel}
+                  />
+                  <BilanSynthèseLigne
+                    label="Stock boutique"
+                    value={summary.boutique}
+                  />
+                </BilanSynthèseBloc>
+
+                <BilanSynthèseBloc title="Éléments liés à l'entreprise">
+                  <BilanSynthèseLigne
+                    label="Trésoreries"
+                    value={summary.treasury}
+                  />
+                  <BilanSynthèseLigne
+                    label="Créances"
+                    value={summary.receivable}
+                  />
+                  <BilanSynthèseLigne
+                    label="Immobilisations"
+                    value={summary.asset}
+                  />
+                </BilanSynthèseBloc>
+
+                <div className="flex justify-between items-baseline gap-4 pt-2 border-t border-border font-semibold text-foreground">
+                  <span>= Total Actif</span>
+                  <span className="font-mono tabular-nums">
+                    {fmt(summary.totalActif)}
+                  </span>
+                </div>
+              </section>
+
+              <section className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-foreground">
                   Passif
                 </p>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm text-slate-600 pl-4">
-                    <span>Dettes (entreprise)</span>
-                    <span className="font-mono">{fmt(summary.payable)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-bold text-slate-800 pt-2 mt-2 border-t-2 border-slate-300">
-                    <span>= Total Passif</span>
-                    <span className="font-mono">
-                      {fmt(summary.totalPassif)}
-                    </span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Capital Net Initial */}
+                <BilanSynthèseBloc title="Éléments liés à l'entreprise">
+                  <BilanSynthèseLigne label="Dettes" value={summary.payable} />
+                </BilanSynthèseBloc>
+
+                <div className="flex justify-between items-baseline gap-4 pt-2 border-t border-border font-semibold text-foreground">
+                  <span>= Total Passif</span>
+                  <span className="font-mono tabular-nums">
+                    {fmt(summary.totalPassif)}
+                  </span>
+                </div>
+              </section>
+
               <div
-                className={`flex justify-between items-center p-4 rounded-lg border-2 ${
+                className={`flex justify-between items-center gap-4 p-4 rounded-lg border ${
                   summary.capitalNet >= 0
-                    ? "bg-green-50 border-green-300"
-                    : "bg-red-50 border-red-300"
+                    ? "bg-[var(--grn)]/10 border-[var(--grn)]/40"
+                    : "bg-[var(--red)]/10 border-[var(--red)]/40"
                 }`}
               >
-                <div>
+                <div className="min-w-0">
                   <p
-                    className={`font-bold text-sm ${
+                    className={`font-semibold text-sm ${
                       summary.capitalNet >= 0
-                        ? "text-green-700"
-                        : "text-red-700"
+                        ? "text-[var(--grn)]"
+                        : "text-[var(--red)]"
                     }`}
                   >
                     Capital Net Initial
                   </p>
-                  <p className="text-xs text-slate-600 mt-1">
-                    Total Actif − Total Passif · lecture seule · agrégat
-                    entreprise (données enregistrées)
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Total Actif − Total Passif
                   </p>
                 </div>
                 <span
-                  className={`font-mono font-extrabold text-xl ${
-                    summary.capitalNet >= 0 ? "text-green-700" : "text-red-700"
+                  className={`font-mono font-bold text-lg tabular-nums shrink-0 ${
+                    summary.capitalNet >= 0
+                      ? "text-[var(--grn)]"
+                      : "text-[var(--red)]"
                   }`}
                 >
                   {fmt(summary.capitalNet)}
@@ -1082,32 +1664,13 @@ export function CompanyInitialisationPage() {
           <DialogHeader>
             <DialogTitle>Valider l&apos;initialisation ?</DialogTitle>
             <DialogDescription>
-              Cette opération est <strong>irréversible</strong>. Elle génère les
-              A Nouveau comptables, les entrées de stock initiales et le Capital
-              Net.
+              Cette opération est <strong>irréversible</strong>. Les écritures A
+              Nouveau ont déjà été enregistrées via les boutons Enregistrer de
+              chaque onglet. La validation verrouille uniquement
+              l&apos;initialisation (capital net actuel :{" "}
+              <strong>{fmt(summary.capitalNet)}</strong>).
             </DialogDescription>
           </DialogHeader>
-
-          <EcriturePreview
-            title="Aperçu de l'écriture A Nouveau"
-            description="Récapitulatif de l'équation comptable d'ouverture (§6.2 — Actif = Passif + Capital)"
-            currency="MGA"
-            lignes={[
-              {
-                libelleCompte:
-                  "Actifs (stocks + trésorerie + créances + immo.)",
-                debit: initialisation?.capital_net_calcule ?? 0,
-                credit: 0,
-                libelle: "Total des actifs initiaux",
-              },
-              {
-                libelleCompte: "Capital Net (101 + dettes initiales)",
-                debit: 0,
-                credit: initialisation?.capital_net_calcule ?? 0,
-                libelle: "Contrepartie en capital + passif",
-              },
-            ]}
-          />
 
           <DialogFooter>
             <Button

@@ -339,8 +339,8 @@ CREATE TABLE prix_carburant (
   marge_litre DECIMAL(10, 4) NOT NULL CHECK (marge_litre >= 0),
   prix_achat DECIMAL(10, 4),
   date_effet DATE NOT NULL DEFAULT CURRENT_DATE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(station_id, type_carburant, date_effet)
+  created_at TIMESTAMPTZ DEFAULT NOW()
+  -- Historisation §6.5 : plusieurs changements par jour autorisés (prix courant = max date_effet, created_at)
 );
 
 -- ============================================================

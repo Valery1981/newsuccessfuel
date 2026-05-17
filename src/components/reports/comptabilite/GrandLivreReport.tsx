@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createClient } from "@/utils/supabase/client";
 import { useAuthStore } from "@/stores/authStore";
@@ -9,7 +9,11 @@ import { ReportFilters, ReportFilterValues } from "@/components/reports/ReportFi
 import { useReportStations, defaultFilterValues } from "@/hooks/useReportStations";
 import { formatCurrency } from "@/lib/utils";
 import { exportCsv } from "@/lib/exportCsv";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  flattenGrandLivreForExport,
+  groupGrandLivreParCompte,
+  type GrandLivreRawRow,
+} from "@/lib/grandLivre";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,144 +22,193 @@ import { fr } from "date-fns/locale";
 
 const supabase = createClient();
 
-interface EcritureRow {
-  id: string;
-  date_ecriture: string;
-  numero_piece: string;
-  libelle: string;
-  numero_compte: string;
-  libelle_compte: string;
-  tiers_nom: string | null;
-  debit: number;
-  credit: number;
-  station_id: string | null;
-}
-
 export function GrandLivreReport() {
   const { entreprise } = useAuthStore();
   const [filters, setFilters] = useState<ReportFilterValues>(defaultFilterValues());
-  const [compteFilter, setCompteFilter] = useState("");
+  const [libelleFilter, setLibelleFilter] = useState("");
   const { data: stations = [] } = useReportStations();
 
-  const { data: rows = [], isLoading } = useQuery<EcritureRow[]>({
-    queryKey: ["report-grand-livre", filters, compteFilter, entreprise?.id],
+  const { data: rawRows = [], isLoading } = useQuery<GrandLivreRawRow[]>({
+    queryKey: ["report-grand-livre", filters, libelleFilter, entreprise?.id],
     queryFn: async () => {
       if (!entreprise) return [];
       let query = supabase
         .from("vue_grand_livre")
-        .select("date_ecriture, numero_piece, libelle_ecriture, numero_compte, libelle_compte, tiers_nom, debit, credit, station_id, reference_numero")
+        .select(
+          "date_ecriture, libelle_ecriture, numero_compte, libelle_compte, tiers_nom, tresorerie_libelle, debit, credit, station_id",
+        )
         .eq("entreprise_id", entreprise.id)
         .gte("date_ecriture", filters.dateDebut)
         .lte("date_ecriture", filters.dateFin)
         .order("date_ecriture", { ascending: true })
-        .limit(500);
+        .limit(5000);
       if (filters.stationId) query = query.eq("station_id", filters.stationId);
-      if (compteFilter.trim()) query = query.ilike("numero_compte", `${compteFilter.trim()}%`);
       const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []).map((e, idx) => {
-        const r = e as Record<string, unknown>;
-        return {
-          id: String(idx),
-          date_ecriture: r.date_ecriture as string,
-          numero_piece: (r.numero_piece as string) ?? "—",
-          libelle: (r.libelle_ecriture as string) ?? "—",
-          numero_compte: (r.numero_compte as string) ?? "—",
-          libelle_compte: (r.libelle_compte as string) ?? "—",
-          tiers_nom: r.tiers_nom as string | null,
-          debit: (r.debit as number) ?? 0,
-          credit: (r.credit as number) ?? 0,
-          station_id: r.station_id as string | null,
-        };
-      });
+
+      const needle = libelleFilter.trim().toLowerCase();
+      return (data ?? [])
+        .map((e) => {
+          const r = e as Record<string, unknown>;
+          return {
+            date_ecriture: r.date_ecriture as string,
+            libelle_ecriture: (r.libelle_ecriture as string) ?? null,
+            numero_compte: (r.numero_compte as string) ?? null,
+            libelle_compte: (r.libelle_compte as string) ?? null,
+            tiers_nom: r.tiers_nom as string | null,
+            tresorerie_libelle: r.tresorerie_libelle as string | null,
+            debit: (r.debit as number) ?? 0,
+            credit: (r.credit as number) ?? 0,
+          } satisfies GrandLivreRawRow;
+        })
+        .filter((row) => {
+          if (!needle) return true;
+          const hay = [
+            row.libelle_compte,
+            row.tiers_nom,
+            row.tresorerie_libelle,
+            row.libelle_ecriture,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return hay.includes(needle);
+        });
     },
     enabled: !!entreprise?.id,
     staleTime: 2 * 60 * 1000,
   });
 
-  const totalDebit = rows.reduce((a, r) => a + r.debit, 0);
-  const totalCredit = rows.reduce((a, r) => a + r.credit, 0);
+  const sections = useMemo(
+    () => groupGrandLivreParCompte(rawRows),
+    [rawRows],
+  );
+
+  const totalDebit = rawRows.reduce((a, r) => a + r.debit, 0);
+  const totalCredit = rawRows.reduce((a, r) => a + r.credit, 0);
 
   function handleExport() {
-    exportCsv(rows.map(r => ({
-      Date: r.date_ecriture,
-      Pièce: r.numero_piece,
-      Libellé: r.libelle,
-      "Compte N°": r.numero_compte,
-      "Compte Libellé": r.libelle_compte,
-      Tiers: r.tiers_nom ?? "",
-      "Débit (Ar)": r.debit,
-      "Crédit (Ar)": r.credit,
-    })), `grand-livre-${filters.dateDebut}-${filters.dateFin}`);
+    exportCsv(
+      flattenGrandLivreForExport(sections),
+      `grand-livre-${filters.dateDebut}-${filters.dateFin}`,
+    );
   }
 
   return (
-    <ReportLayout title="Grand Livre" description="Écritures comptables chronologiques par compte" onExport={handleExport}>
+    <ReportLayout
+      title="Grand Livre"
+      description="Mouvements par compte, ordre comptable (classes 1 à 7), solde progressif"
+      onExport={handleExport}
+    >
       <div className="mt-4 space-y-4">
         <ReportFilters stations={stations} values={filters} onChange={setFilters} />
 
         <div className="flex items-end gap-3">
-          <div className="space-y-1 max-w-[200px]">
-            <Label className="text-xs">Filtrer par compte (N°)</Label>
-            <Input placeholder="Ex: 401, 512..." value={compteFilter} onChange={e => setCompteFilter(e.target.value)} className="h-8 text-xs" />
+          <div className="space-y-1 max-w-xs">
+            <Label className="text-xs">Rechercher un compte (libellé)</Label>
+            <Input
+              placeholder="Ex: Banque, Dupont, Stock Essence…"
+              value={libelleFilter}
+              onChange={(e) => setLibelleFilter(e.target.value)}
+              className="h-8 text-xs"
+            />
           </div>
         </div>
 
         <div className="flex gap-4 flex-wrap">
           <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 text-sm">
             <span className="text-muted-foreground">Total Débit :</span>{" "}
-            <span className="font-semibold text-blue-700">{formatCurrency(totalDebit)}</span>
+            <span className="font-semibold text-blue-700">
+              {formatCurrency(totalDebit)}
+            </span>
           </div>
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm">
             <span className="text-muted-foreground">Total Crédit :</span>{" "}
-            <span className="font-semibold text-amber-700">{formatCurrency(totalCredit)}</span>
+            <span className="font-semibold text-amber-700">
+              {formatCurrency(totalCredit)}
+            </span>
           </div>
           <div className="bg-gray-50 border rounded-lg px-4 py-2 text-sm">
-            <span className="text-muted-foreground">Écritures :</span>{" "}
-            <span className="font-semibold">{rows.length}</span>
+            <span className="text-muted-foreground">Comptes :</span>{" "}
+            <span className="font-semibold">{sections.length}</span>
           </div>
         </div>
 
-        {isLoading ? <PageLoading /> : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Pièce</TableHead>
-                  <TableHead>Compte</TableHead>
-                  <TableHead>Libellé</TableHead>
-                  <TableHead>Tiers</TableHead>
-                  <TableHead className="text-right">Débit</TableHead>
-                  <TableHead className="text-right">Crédit</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-10">Aucune écriture sur cette période</TableCell>
-                  </TableRow>
-                ) : rows.map((r, idx) => (
-                  <TableRow key={idx}>
-                    <TableCell className="text-xs whitespace-nowrap">{format(new Date(r.date_ecriture), "dd/MM/yyyy", { locale: fr })}</TableCell>
-                    <TableCell className="text-xs font-mono">{r.numero_piece}</TableCell>
-                    <TableCell className="text-xs">
-                      <span className="font-mono font-medium">{r.numero_compte}</span>
-                      <span className="text-muted-foreground ml-1 hidden sm:inline">— {r.libelle_compte}</span>
-                    </TableCell>
-                    <TableCell className="text-xs max-w-[180px] truncate">{r.libelle}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{r.tiers_nom ?? "—"}</TableCell>
-                    <TableCell className="text-right text-sm">{r.debit > 0 ? formatCurrency(r.debit) : ""}</TableCell>
-                    <TableCell className="text-right text-sm">{r.credit > 0 ? formatCurrency(r.credit) : ""}</TableCell>
-                  </TableRow>
-                ))}
-                <TableRow className="bg-muted/50 font-semibold">
-                  <TableCell colSpan={5} className="text-sm">Totaux</TableCell>
-                  <TableCell className="text-right text-sm">{formatCurrency(totalDebit)}</TableCell>
-                  <TableCell className="text-right text-sm">{formatCurrency(totalCredit)}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+        {isLoading ? (
+          <PageLoading />
+        ) : sections.length === 0 ? (
+          <p className="text-center text-muted-foreground py-10">
+            Aucune écriture sur cette période
+          </p>
+        ) : (
+          <div className="space-y-8">
+            {sections.map((section) => (
+              <div key={section.compteNumero} className="rounded-md border overflow-hidden">
+                <div className="bg-nav/90 text-white px-4 py-2.5">
+                  <p className="font-semibold text-sm">{section.compteLabel}</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40">
+                        <th className="text-left px-3 py-2 font-medium text-xs">
+                          Date
+                        </th>
+                        <th className="text-left px-3 py-2 font-medium text-xs">
+                          Libellé
+                        </th>
+                        <th className="text-right px-3 py-2 font-medium text-xs">
+                          Débit
+                        </th>
+                        <th className="text-right px-3 py-2 font-medium text-xs">
+                          Crédit
+                        </th>
+                        <th className="text-right px-3 py-2 font-medium text-xs">
+                          Solde
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {section.mouvements.map((m, idx) => (
+                        <tr key={idx} className="border-b border-border/50">
+                          <td className="px-3 py-1.5 text-xs whitespace-nowrap">
+                            {format(new Date(m.date), "dd/MM/yyyy", {
+                              locale: fr,
+                            })}
+                          </td>
+                          <td className="px-3 py-1.5 text-xs max-w-[240px] truncate">
+                            {m.libelle}
+                          </td>
+                          <td className="px-3 py-1.5 text-xs text-right tabular-nums">
+                            {m.debit > 0 ? formatCurrency(m.debit) : ""}
+                          </td>
+                          <td className="px-3 py-1.5 text-xs text-right tabular-nums">
+                            {m.credit > 0 ? formatCurrency(m.credit) : ""}
+                          </td>
+                          <td className="px-3 py-1.5 text-xs text-right tabular-nums font-medium">
+                            {formatCurrency(m.solde)}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-muted/50 font-semibold">
+                        <td colSpan={2} className="px-3 py-2 text-xs">
+                          Total {section.compteLabel}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-right">
+                          {formatCurrency(section.totalDebit)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-right">
+                          {formatCurrency(section.totalCredit)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-right">
+                          {formatCurrency(section.soldeFinal)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

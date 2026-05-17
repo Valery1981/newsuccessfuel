@@ -7,6 +7,11 @@ import { useAuthStore } from "@/stores/authStore";
 import { ReportLayout } from "@/components/reports/ReportLayout";
 import { ReportFilters, ReportFilterValues } from "@/components/reports/ReportFilters";
 import { useReportStations, defaultFilterValues } from "@/hooks/useReportStations";
+import {
+  compareCompteNumero,
+  getCompteDisplayLabel,
+  type GrandLivreRawRow,
+} from "@/lib/grandLivre";
 import { formatCurrency } from "@/lib/utils";
 import { exportCsv } from "@/lib/exportCsv";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,8 +20,8 @@ import { PageLoading } from "@/components/common/LoadingSpinner";
 const supabase = createClient();
 
 interface BalanceLigne {
-  numero_compte: string;
-  libelle_compte: string;
+  compte_numero: string;
+  compte_label: string;
   total_debit: number;
   total_credit: number;
   solde_debiteur: number;
@@ -36,7 +41,7 @@ export function BalanceReport() {
       // On utilise vue_grand_livre pour calculer une balance sur la période.
       let query = supabase
         .from("vue_grand_livre")
-        .select("numero_compte, libelle_compte, debit, credit")
+        .select("numero_compte, libelle_compte, tiers_nom, tresorerie_libelle, debit, credit")
         .eq("entreprise_id", entreprise.id)
         .gte("date_ecriture", filters.dateDebut)
         .lte("date_ecriture", filters.dateFin);
@@ -44,22 +49,36 @@ export function BalanceReport() {
       const { data, error } = await query;
       if (error) throw error;
 
-      const map: Record<string, { libelle: string; debit: number; credit: number }> = {};
-      for (const e of (data ?? [])) {
+      const map: Record<
+        string,
+        { label: string; debit: number; credit: number }
+      > = {};
+      for (const e of data ?? []) {
         const r = e as Record<string, unknown>;
-        const num = (r.numero_compte as string) ?? "—";
-        if (!map[num]) map[num] = { libelle: (r.libelle_compte as string) ?? "—", debit: 0, credit: 0 };
-        map[num].debit += (r.debit as number) ?? 0;
-        map[num].credit += (r.credit as number) ?? 0;
+        const numero = ((r.numero_compte as string) ?? "").trim() || "_";
+        const row: GrandLivreRawRow = {
+          date_ecriture: "",
+          libelle_ecriture: null,
+          numero_compte: numero,
+          libelle_compte: (r.libelle_compte as string) ?? null,
+          tiers_nom: r.tiers_nom as string | null,
+          tresorerie_libelle: r.tresorerie_libelle as string | null,
+          debit: (r.debit as number) ?? 0,
+          credit: (r.credit as number) ?? 0,
+        };
+        const label = getCompteDisplayLabel(row);
+        if (!map[numero]) map[numero] = { label, debit: 0, credit: 0 };
+        map[numero].debit += row.debit;
+        map[numero].credit += row.credit;
       }
 
       return Object.entries(map)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([num, v]) => {
+        .sort(([a], [b]) => compareCompteNumero(a, b))
+        .map(([numero, v]) => {
           const solde = v.debit - v.credit;
           return {
-            numero_compte: num,
-            libelle_compte: v.libelle,
+            compte_numero: numero,
+            compte_label: v.label,
             total_debit: v.debit,
             total_credit: v.credit,
             solde_debiteur: solde > 0 ? solde : 0,
@@ -78,8 +97,7 @@ export function BalanceReport() {
 
   function handleExport() {
     exportCsv(rows.map(r => ({
-      "Compte N°": r.numero_compte,
-      "Compte Libellé": r.libelle_compte,
+      Compte: r.compte_label,
       "Débit cumulé (Ar)": r.total_debit,
       "Crédit cumulé (Ar)": r.total_credit,
       "Solde débiteur (Ar)": r.solde_debiteur,
@@ -97,8 +115,7 @@ export function BalanceReport() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>N° Compte</TableHead>
-                  <TableHead>Libellé</TableHead>
+                  <TableHead>Compte</TableHead>
                   <TableHead className="text-right">Débit cumulé</TableHead>
                   <TableHead className="text-right">Crédit cumulé</TableHead>
                   <TableHead className="text-right">Solde débiteur</TableHead>
@@ -108,12 +125,11 @@ export function BalanceReport() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-10">Aucune écriture sur cette période</TableCell>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-10">Aucune écriture sur cette période</TableCell>
                   </TableRow>
                 ) : rows.map(r => (
-                  <TableRow key={r.numero_compte}>
-                    <TableCell className="text-sm font-mono font-medium">{r.numero_compte}</TableCell>
-                    <TableCell className="text-sm">{r.libelle_compte}</TableCell>
+                  <TableRow key={r.compte_numero}>
+                    <TableCell className="text-sm font-medium">{r.compte_label}</TableCell>
                     <TableCell className="text-right text-sm">{formatCurrency(r.total_debit)}</TableCell>
                     <TableCell className="text-right text-sm">{formatCurrency(r.total_credit)}</TableCell>
                     <TableCell className="text-right text-sm text-blue-700">{r.solde_debiteur > 0 ? formatCurrency(r.solde_debiteur) : ""}</TableCell>
@@ -121,7 +137,7 @@ export function BalanceReport() {
                   </TableRow>
                 ))}
                 <TableRow className="bg-muted/50 font-semibold border-t-2">
-                  <TableCell colSpan={2} className="text-sm">Totaux</TableCell>
+                  <TableCell className="text-sm">Totaux</TableCell>
                   <TableCell className="text-right text-sm">{formatCurrency(totalDebit)}</TableCell>
                   <TableCell className="text-right text-sm">{formatCurrency(totalCredit)}</TableCell>
                   <TableCell className="text-right text-sm text-blue-700">{formatCurrency(totalSoldeD)}</TableCell>

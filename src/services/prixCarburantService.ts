@@ -1,3 +1,8 @@
+import {
+  calculerPrixAchatCarburant,
+  selectPrixCarburantActifPourDate,
+  type PrixAchatCarburantResolu,
+} from "@/lib/prixCarburant";
 import type { Database } from "@/types/supabase";
 import { createClient } from "@/utils/supabase/client";
 
@@ -28,7 +33,8 @@ export const prixCarburantService = {
       .from("prix_carburant")
       .select("*")
       .eq("station_id", stationId)
-      .order("date_effet", { ascending: false });
+      .order("date_effet", { ascending: false })
+      .order("created_at", { ascending: false });
     if (error) throw error;
     return data ?? [];
   },
@@ -39,15 +45,14 @@ export const prixCarburantService = {
       .from("prix_carburant")
       .select("*")
       .eq("station_id", stationId)
-      .order("date_effet", { ascending: false });
+      .order("date_effet", { ascending: false })
+      .order("created_at", { ascending: false });
     if (error) throw error;
-    // Garder le plus récent par type_carburant
     const byType = new Map<string, PrixCarburantRow>();
     for (const row of data ?? []) {
-      if (!row.type_carburant) continue;
-      if (!byType.has(row.type_carburant)) {
-        byType.set(row.type_carburant, row);
-      }
+      const key = row.type_carburant_id ?? row.type_carburant;
+      if (!key || byType.has(key)) continue;
+      byType.set(key, row);
     }
     return Array.from(byType.values());
   },
@@ -73,5 +78,56 @@ export const prixCarburantService = {
       .single();
     if (error) throw error;
     return data;
+  },
+
+  /**
+   * Prix d'achat actif pour un achat carburant (Structure > Prix carburant).
+   * Dernier enregistrement avec date_effet ≤ dateReference.
+   */
+  async getPrixAchatActif(params: {
+    stationId: string;
+    typeCarburantId: string;
+    dateReference: string;
+  }): Promise<PrixAchatCarburantResolu | null> {
+    const dateRef = params.dateReference.slice(0, 10);
+    const { data, error } = await supabase
+      .from("prix_carburant")
+      .select(
+        "type_carburant_id, date_effet, prix_vente, marge_litre, prix_achat, created_at",
+      )
+      .eq("station_id", params.stationId)
+      .eq("type_carburant_id", params.typeCarburantId)
+      .lte("date_effet", dateRef)
+      .order("date_effet", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const prixAchat =
+      data.prix_achat != null && Number.isFinite(data.prix_achat)
+        ? data.prix_achat
+        : calculerPrixAchatCarburant(data.prix_vente, data.marge_litre);
+    if (prixAchat <= 0) return null;
+    return {
+      prixAchat,
+      prixVente: data.prix_vente,
+      margeLitre: data.marge_litre,
+      dateEffet: data.date_effet.slice(0, 10),
+    };
+  },
+
+  /** Historique filtré puis résolution locale (tests / batch). */
+  async resolvePrixAchatDepuisHistorique(params: {
+    stationId: string;
+    typeCarburantId: string;
+    dateReference: string;
+  }): Promise<PrixAchatCarburantResolu | null> {
+    const rows = await this.getHistorique(params.stationId);
+    return selectPrixCarburantActifPourDate(
+      rows,
+      params.typeCarburantId,
+      params.dateReference,
+    );
   },
 };

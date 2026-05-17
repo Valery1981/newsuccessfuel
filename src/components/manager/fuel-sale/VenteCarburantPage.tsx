@@ -214,6 +214,7 @@ export function VenteCarburantPage() {
           .eq("station_id", shiftRow.station_id!)
           .eq("type_carburant", pistoletRow.type_carburant)
           .order("date_effet", { ascending: false })
+          .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
         prixVente = prixRow?.prix_vente ?? 0;

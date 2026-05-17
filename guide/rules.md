@@ -746,9 +746,12 @@ Import fichier (PNG, PDF, JPG) :
 
 ### 6.7 Validations Initialisation
 
-- **Enregistrer** : sauvegarde temporaire, modifiable, aucune écriture générée
-- **Valider Initialisation** : irréversible, génère A Nouveau, verrouille définitivement la page
-- Capital Net (101) = Total Actif − Total Dettes (calculé et affiché avant validation)
+- **Enregistrer** (par onglet) : sauvegarde staging + A Nouveau immédiats dans le Grand Livre (remplacement par module, pas de doublon) + bilan d'ouverture à jour ; modifiable tant que non validé
+- **Valider Initialisation** : irréversible, verrouille uniquement — **ne génère ni écritures ni mouvements stock**
+- Capital Net (101) = Total Actif − Total Dettes (calculé à la validation et affiché dans la synthèse après chaque Enregistrer)
+- Cuves : jauge → `get_volume_from_jauge()`, PA = PV − marge, A Nouveau 310/320/330
+- Stock boutique : `entree_initiale` + A Nouveau 340/350/360/370
+- Pistolets : index initiaux uniquement (pas d'écriture comptable)
 
 ### 6.8 Partenaire — Données Interdites
 

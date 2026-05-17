@@ -4,7 +4,13 @@ import { PermissionGate } from "@/components/auth/PermissionGate";
 import { PageLoading } from "@/components/common/LoadingSpinner";
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
-import { ComptabiliserAchatDialog } from "@/components/compta/ComptabiliserAchatDialog";
+import { AchatBLRecap } from "@/components/manager/fuel-purchase/AchatBLRecap";
+import { ComptabiliserStockAchatDialog } from "@/components/manager/fuel-purchase/ComptabiliserStockAchatDialog";
+import {
+  ReceptionCarburantForm,
+  type CompartimentAffectationState,
+  type CuveJaugeFormState,
+} from "@/components/manager/fuel-purchase/ReceptionCarburantForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +35,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
 import { buildBLPrintHtml, openPrintWindow } from "@/lib/printUtils";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { achatCarburantService } from "@/services/achatCarburantService";
+import { cuveService } from "@/services/cuveService";
 import { stationService } from "@/services/stationService";
 import { tiersService } from "@/services/tiersService";
 import { useAuthStore } from "@/stores/authStore";
@@ -37,6 +45,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle,
   CreditCard,
+  Eye,
   FileText,
   Loader2,
   Plus,
@@ -44,7 +53,21 @@ import {
   ShoppingCart,
   Truck,
 } from "lucide-react";
-import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  calculerMontantLigneAchatCarburant,
+  PRIX_CARBURANT_ACHAT_MANQUANT,
+} from "@/lib/prixCarburant";
+import {
+  LigneBCFormRow,
+  type LigneBCState,
+} from "@/components/manager/fuel-purchase/LigneBCFormRow";
+import { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 const supabase = createClient();
@@ -73,23 +96,21 @@ export function AchatCarburantPage() {
   const [activeMainTab, setActiveMainTab] = useState("liste");
   const [nouvelAchatStep, setNouvelAchatStep] = useState<1 | 2 | 3 | 4>(1);
   const [currentAchatId, setCurrentAchatId] = useState<string | null>(null);
-  // APEX-16-suite : aperçu écriture avant comptabilisation
+  const [currentNumeroBc, setCurrentNumeroBc] = useState<string>("");
   const [previewComptaAchat, setPreviewComptaAchat] =
     useState<AchatCarburant | null>(null);
+  const [detailAchatId, setDetailAchatId] = useState<string | null>(null);
   const [selectedFournisseurId, setSelectedFournisseurId] =
     useState<string>("");
 
   // Lignes BC
   const { data: typesCarburant } = useTypesCarburantActifs();
 
-  const [lignesBC, setLignesBC] = useState<
-    Array<{
-      station_id: string;
-      produit: string;
-      quantite_commandee: string;
-      prix_unitaire: string;
-    }>
-  >([
+  const [dateCommande, setDateCommande] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
+
+  const [lignesBC, setLignesBC] = useState<LigneBCState[]>([
     {
       station_id: "",
       produit: "",
@@ -97,6 +118,53 @@ export function AchatCarburantPage() {
       prix_unitaire: "",
     },
   ]);
+
+  const handleLigneBCChange = useCallback(
+    (idx: number, patch: Partial<LigneBCState>) => {
+      setLignesBC((prev) =>
+        prev.map((li, i) => (i === idx ? { ...li, ...patch } : li)),
+      );
+    },
+    [],
+  );
+
+  const montantBCEstimatif = useMemo(
+    () =>
+      lignesBC.reduce(
+        (acc, l) =>
+          acc +
+          calculerMontantLigneAchatCarburant(
+            Number(l.quantite_commandee) || 0,
+            Number(l.prix_unitaire) || 0,
+          ),
+        0,
+      ),
+    [lignesBC],
+  );
+
+  const lignesBCValidesPourCreation = useMemo(
+    () =>
+      lignesBC.filter(
+        (l) =>
+          l.station_id &&
+          l.produit &&
+          Number(l.quantite_commandee) > 0 &&
+          Number(l.prix_unitaire) > 0,
+      ),
+    [lignesBC],
+  );
+
+  const lignesBCAvecPrixManquant = useMemo(
+    () =>
+      lignesBC.some(
+        (l) =>
+          l.station_id &&
+          l.produit &&
+          Number(l.quantite_commandee) > 0 &&
+          !(Number(l.prix_unitaire) > 0),
+      ),
+    [lignesBC],
+  );
 
   // Paiements
   const [paiementsBC, setPaiementsBC] = useState([
@@ -106,18 +174,40 @@ export function AchatCarburantPage() {
     new Date().toISOString().split("T")[0],
   );
 
-  // Réception
-  const [receptionData, setReceptionData] = useState({
-    camion_id: "",
-    date_livraison: new Date().toISOString().split("T")[0],
-    numero_bl: "",
-    lignes: [] as Array<{
-      cuve_id: string;
-      jauge_avant: string;
-      jauge_apres: string;
-      quantite_nominee: string;
-    }>,
-  });
+  const [receptionCamionId, setReceptionCamionId] = useState("");
+  const [receptionDateLivraison, setReceptionDateLivraison] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
+  const [receptionNumeroBl, setReceptionNumeroBl] = useState("");
+  const [receptionCompartiments, setReceptionCompartiments] = useState<
+    CompartimentAffectationState[]
+  >([]);
+  const [receptionJaugesParCuve, setReceptionJaugesParCuve] = useState<
+    Record<string, CuveJaugeFormState>
+  >({});
+
+  const resetNouvelAchat = useCallback(() => {
+    setNouvelAchatStep(1);
+    setCurrentAchatId(null);
+    setCurrentNumeroBc("");
+    setSelectedFournisseurId("");
+    setDateCommande(new Date().toISOString().split("T")[0]);
+    setLignesBC([
+      {
+        station_id: "",
+        produit: "",
+        quantite_commandee: "",
+        prix_unitaire: "",
+      },
+    ]);
+    setPaiementsBC([{ tresorerie_id: "", montant: "", reference: "" }]);
+    setDatePrelevement(new Date().toISOString().split("T")[0]);
+    setReceptionCamionId("");
+    setReceptionDateLivraison(new Date().toISOString().split("T")[0]);
+    setReceptionNumeroBl("");
+    setReceptionCompartiments([]);
+    setReceptionJaugesParCuve({});
+  }, []);
 
   const { data: stations } = useQuery({
     queryKey: ["stations", entreprise?.id],
@@ -165,129 +255,91 @@ export function AchatCarburantPage() {
     queryKey: ["achats-carburant", entreprise?.id],
     queryFn: async () => {
       if (!entreprise) return [];
-      const { data } = await supabase
-        .from("achats_carburant")
-        .select(
-          "id, numero_bc, numero_bl, fournisseur_id, statut, date_commande, date_livraison, montant_facture, total_paye, mouvemente_at, comptabilise_at, tiers!fournisseur_id(nom)",
-        )
-        .eq("entreprise_id", entreprise.id)
-        .order("date_commande", { ascending: false })
-        .limit(50);
-      return ((data ?? []) as unknown[]).map((a) => {
-        const row = a as Record<string, unknown>;
-        return {
-          ...row,
-          mouvemente: !!row.mouvemente_at,
-          comptabilise: !!row.comptabilise_at,
-          fournisseur_nom: (row.tiers as Record<string, unknown> | null)
-            ?.nom as string | undefined,
-        } as AchatCarburant;
-      });
+      const list = await achatCarburantService.list(entreprise.id);
+      return list.map((a) => ({
+        ...a,
+        statut: a.statut ?? "commande",
+      })) as AchatCarburant[];
     },
     enabled: !!entreprise?.id,
   });
 
-  // Créer bon de commande
+  const { data: detailAchat } = useQuery({
+    queryKey: ["achat-carburant-detail", detailAchatId],
+    queryFn: () => achatCarburantService.getDetail(detailAchatId!),
+    enabled: !!detailAchatId,
+  });
+
+  const { data: detailNouvelAchat } = useQuery({
+    queryKey: ["achat-carburant-detail", currentAchatId],
+    queryFn: () => achatCarburantService.getDetail(currentAchatId!),
+    enabled: !!currentAchatId && nouvelAchatStep === 4,
+  });
+
+  const { data: previewComptaLignes } = useQuery({
+    queryKey: ["preview-compta-stock", previewComptaAchat?.id],
+    queryFn: () =>
+      achatCarburantService.buildPreviewComptaStock(previewComptaAchat!.id),
+    enabled: !!previewComptaAchat?.id,
+  });
+
   const creerBCMutation = useMutation({
     mutationFn: async (fournisseurId: string) => {
       if (!fournisseurId) throw new Error("Sélectionnez un fournisseur");
       if (!entreprise) throw new Error("Session invalide");
-      const numero = `BC-${Date.now()}`;
-      const lignesValides = lignesBC.filter(
-        (l) => l.station_id && l.produit && Number(l.quantite_commandee) > 0,
-      );
-      if (lignesValides.length === 0)
-        throw new Error("Ajoutez au moins une ligne au bon de commande");
+      if (lignesBCAvecPrixManquant) throw new Error(PRIX_CARBURANT_ACHAT_MANQUANT);
 
-      const montantEstimatif = lignesValides.reduce(
-        (acc, l) =>
-          acc + Number(l.quantite_commandee) * Number(l.prix_unitaire || 0),
-        0,
-      );
-
-      // Insert BC — type implicitement vérifié
-      const bcInsert: import("@/types/supabase").Database["public"]["Tables"]["achats_carburant"]["Insert"] =
-        {
-          entreprise_id: entreprise.id,
-          numero_bc: numero,
-          fournisseur_id: fournisseurId,
-          statut: "commande" as import("@/types/supabase").AchatStatut,
-          date_commande: new Date().toISOString().split("T")[0],
-          montant_facture: montantEstimatif,
-          total_paye: 0,
-          created_by: compte?.session_id ?? null,
+      const lignesValides = lignesBCValidesPourCreation.map((l) => {
+        const tc = (typesCarburant ?? []).find((t) => t.id === l.produit);
+        return {
+          station_id: l.station_id,
+          type_carburant_id: l.produit,
+          type_carburant_label: tc?.label ?? l.produit,
+          quantite_commandee: Number(l.quantite_commandee),
+          prix_achat_unitaire: Number(l.prix_unitaire),
         };
-      const { data: achat, error } = await supabase
-        .from("achats_carburant")
-        .insert(bcInsert)
-        .select("id, numero_bc")
-        .single();
-      if (error) throw error;
-      if (!achat) throw new Error("Erreur lors de la création");
+      });
 
-      // Lignes BC (table réelle : lignes_bc_carburant)
-      const lignesInsert: import("@/types/supabase").Database["public"]["Tables"]["lignes_bc_carburant"]["Insert"][] =
-        lignesValides.map((l) => {
-          const tc = (typesCarburant ?? []).find((t) => t.id === l.produit);
-          return {
-            achat_id: achat.id,
-            station_id: l.station_id || null,
-            type_carburant_id: l.produit,
-            // Compat legacy : libellé string alimenté via label, trigger DB synchronise.
-            type_carburant: tc?.label ?? l.produit,
-            quantite_commandee: Number(l.quantite_commandee),
-          };
-        });
-      await supabase.from("lignes_bc_carburant").insert(lignesInsert);
-
-      return achat;
+      return achatCarburantService.createBonCommande({
+        entrepriseId: entreprise.id,
+        fournisseurId,
+        dateCommande,
+        createdBy: compte?.session_id ?? null,
+        lignes: lignesValides,
+      });
     },
     onSuccess: (achat) => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
       setCurrentAchatId(achat.id);
+      setCurrentNumeroBc(achat.numero_bc);
       setNouvelAchatStep(2);
       toast.success(`BC ${achat.numero_bc} créé. Passez à l'étape Paiement.`);
     },
     onError: (error) => toast.error("Erreur : " + (error as Error).message),
   });
 
-  // Enregistrer paiement
   const enregistrerPaiementMutation = useMutation({
     mutationFn: async () => {
-      if (!currentAchatId || !entreprise) throw new Error("Session invalide");
-      const paiementsValides = paiementsBC.filter(
-        (p) => p.tresorerie_id && Number(p.montant) > 0,
-      );
-      if (paiementsValides.length === 0)
-        throw new Error("Saisissez au moins un paiement");
-      const totalPaye = paiementsValides.reduce(
-        (acc, p) => acc + Number(p.montant),
-        0,
-      );
+      if (!currentAchatId || !entreprise || !selectedFournisseurId) {
+        throw new Error("Session invalide");
+      }
+      const paiementsValides = paiementsBC
+        .filter((p) => p.tresorerie_id && Number(p.montant) > 0)
+        .map((p) => ({
+          tresorerie_id: p.tresorerie_id,
+          montant: Number(p.montant),
+          date_paiement: datePrelevement,
+          reference: p.reference || currentNumeroBc,
+        }));
 
-      // Insérer paiements (type sécurisé)
-      type PaieInsert =
-        import("@/types/supabase").Database["public"]["Tables"]["paiements_achat_carburant"]["Insert"];
-      const paieInserts: PaieInsert[] = paiementsValides.map((p) => ({
-        achat_id: currentAchatId,
-        tresorerie_id: p.tresorerie_id || null,
-        montant: Number(p.montant),
-        date_paiement: datePrelevement,
-        reference: p.reference || null,
-      }));
-      await supabase.from("paiements_achat_carburant").insert(paieInserts);
-
-      // Mise à jour statut achat (type sécurisé)
-      type AchatUpdate =
-        import("@/types/supabase").Database["public"]["Tables"]["achats_carburant"]["Update"];
-      const updateAchat: AchatUpdate = {
-        statut: "paye" as import("@/types/supabase").AchatStatut,
-        total_paye: totalPaye,
-      };
-      await supabase
-        .from("achats_carburant")
-        .update(updateAchat)
-        .eq("id", currentAchatId);
+      await achatCarburantService.enregistrerPaiements({
+        achatId: currentAchatId,
+        entrepriseId: entreprise.id,
+        fournisseurId: selectedFournisseurId,
+        numeroBc: currentNumeroBc,
+        createdBy: compte?.session_id ?? null,
+        paiements: paiementsValides,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
@@ -297,49 +349,82 @@ export function AchatCarburantPage() {
     onError: (error) => toast.error("Erreur : " + (error as Error).message),
   });
 
-  // Enregistrer réception (jauges avant/après, camion)
   const enregistrerReceptionMutation = useMutation({
     mutationFn: async () => {
       if (!currentAchatId || !entreprise) throw new Error("Session invalide");
-      if (!receptionData.date_livraison)
-        throw new Error("Date de livraison requise");
-      if (!receptionData.camion_id) throw new Error("Sélectionnez le camion");
+      if (!receptionCamionId) throw new Error("Sélectionnez le camion");
+      if (receptionCompartiments.length === 0) {
+        throw new Error("Ajoutez au moins un compartiment affecté");
+      }
 
-      type AchatUpdate =
-        import("@/types/supabase").Database["public"]["Tables"]["achats_carburant"]["Update"];
-      const receptionUpdate: AchatUpdate = {
-        statut: "livre" as import("@/types/supabase").AchatStatut,
-        date_livraison: receptionData.date_livraison,
-        numero_bl: receptionData.numero_bl || null,
-        camion_id: receptionData.camion_id || null,
-      };
-      await supabase
-        .from("achats_carburant")
-        .update(receptionUpdate)
-        .eq("id", currentAchatId);
+      const compartimentsInput = receptionCompartiments.map((l) => {
+        if (!l.compartiment_id || !l.station_id || !l.cuve_id) {
+          throw new Error("Chaque compartiment doit avoir station et cuve");
+        }
+        const volNom = Number(l.volume_nominal);
+        if (!(volNom > 0)) throw new Error("Volume nominal obligatoire");
+        return {
+          compartiment_id: l.compartiment_id,
+          station_id: l.station_id,
+          cuve_id: l.cuve_id,
+          type_carburant_id: l.type_carburant_id,
+          volume_nominal: volNom,
+        };
+      });
+
+      const cuveIds = [...new Set(compartimentsInput.map((c) => c.cuve_id))];
+      const jaugesCuves = await Promise.all(
+        cuveIds.map(async (cuveId) => {
+          const jauge = receptionJaugesParCuve[cuveId];
+          if (!jauge) {
+            throw new Error("Jauge avant/après obligatoire pour chaque cuve");
+          }
+          const comp = compartimentsInput.find((c) => c.cuve_id === cuveId)!;
+          const jA = Number(jauge.jauge_avant_cm);
+          const jAp = Number(jauge.jauge_apres_cm);
+          const volumeAvant = await cuveService.getVolumeFromJauge(cuveId, jA);
+          const volumeApres = await cuveService.getVolumeFromJauge(cuveId, jAp);
+          return {
+            cuve_id: cuveId,
+            station_id: comp.station_id,
+            type_carburant_id: comp.type_carburant_id,
+            jauge_avant_cm: jA,
+            jauge_apres_cm: jAp,
+            volume_avant_litres: volumeAvant,
+            volume_apres_litres: volumeApres,
+          };
+        }),
+      );
+
+      return achatCarburantService.enregistrerReception({
+        achatId: currentAchatId,
+        entrepriseId: entreprise.id,
+        camionId: receptionCamionId,
+        dateLivraison: receptionDateLivraison,
+        numeroBl: receptionNumeroBl,
+        compartiments: compartimentsInput,
+        jaugesCuves,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
+      queryClient.invalidateQueries({
+        queryKey: ["achat-carburant-detail", currentAchatId],
+      });
       setNouvelAchatStep(4);
       toast.success("Réception enregistrée. Vérifiez le BL/Facture.");
     },
     onError: (error) => toast.error("Erreur : " + (error as Error).message),
   });
 
-  // Mouvementer stock (marque l'achat comme mouvementé)
   const mouvementerMutation = useMutation({
     mutationFn: async (achatId: string) => {
-      type AchatUpdate =
-        import("@/types/supabase").Database["public"]["Tables"]["achats_carburant"]["Update"];
-      const updateData: AchatUpdate = {
-        mouvemente_at: new Date().toISOString(),
-        mouvemente_par: compte?.id ?? null,
-      };
-      const { error } = await supabase
-        .from("achats_carburant")
-        .update(updateData)
-        .eq("id", achatId);
-      if (error) throw error;
+      if (!entreprise) throw new Error("Session invalide");
+      await achatCarburantService.mouvementerStock({
+        achatId,
+        entrepriseId: entreprise.id,
+        sessionId: compte?.session_id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
@@ -349,20 +434,14 @@ export function AchatCarburantPage() {
       toast.error("Erreur mouventation : " + (e as Error).message),
   });
 
-  // Comptabiliser (marque l'achat comme comptabilisé)
   const comptabiliserMutation = useMutation({
     mutationFn: async (achatId: string) => {
-      type AchatUpdate =
-        import("@/types/supabase").Database["public"]["Tables"]["achats_carburant"]["Update"];
-      const updateData: AchatUpdate = {
-        comptabilise_at: new Date().toISOString(),
-        comptabilise_par: compte?.id ?? null,
-      };
-      const { error } = await supabase
-        .from("achats_carburant")
-        .update(updateData)
-        .eq("id", achatId);
-      if (error) throw error;
+      if (!entreprise) throw new Error("Session invalide");
+      await achatCarburantService.comptabiliser({
+        achatId,
+        entrepriseId: entreprise.id,
+        createdBy: compte?.session_id ?? null,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["achats-carburant"] });
@@ -383,9 +462,8 @@ export function AchatCarburantPage() {
         actions={
           <Button
             onClick={() => {
+              resetNouvelAchat();
               setActiveMainTab("nouveau");
-              setNouvelAchatStep(1);
-              setCurrentAchatId(null);
             }}
           >
             <Plus className="w-4 h-4 mr-1" />
@@ -447,8 +525,17 @@ export function AchatCarburantPage() {
                           <AchatStatusBadge achat={achat} />
                         </TableCell>
                         <TableCell>
-                          <div className="flex gap-1">
-                            {achat.statut === "livre" && !achat.mouvemente && (
+                          <div className="flex gap-1 flex-wrap">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-xs"
+                              onClick={() => setDetailAchatId(achat.id)}
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              Détails
+                            </Button>
+                            {achat.statut === "recu" && !achat.mouvemente && (
                               <PermissionGate permission="traitement_achat_carburant_mouvementer">
                                 <Button
                                   size="sm"
@@ -550,6 +637,20 @@ export function AchatCarburantPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
+                  <Label>Date commande *</Label>
+                  <Input
+                    type="date"
+                    value={dateCommande}
+                    onChange={(e) => setDateCommande(e.target.value)}
+                    className="mt-1 max-w-xs"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Prix d&apos;achat issu de Structure → Prix carburant (actif
+                    à cette date).
+                  </p>
+                </div>
+
+                <div>
                   <Label>Fournisseur *</Label>
                   <Select
                     value={selectedFournisseurId}
@@ -593,91 +694,28 @@ export function AchatCarburantPage() {
                     </Button>
                   </div>
                   {lignesBC.map((ligne, idx) => (
-                    <div key={idx} className="grid grid-cols-4 gap-2 mb-2">
-                      <Select
-                        value={ligne.station_id}
-                        onValueChange={(v) =>
-                          setLignesBC((l) =>
-                            l.map((li, i) =>
-                              i === idx ? { ...li, station_id: v ?? "" } : li,
-                            ),
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Station">
-                            {
-                              (stations ?? []).find(
-                                (s) => s.id === ligne.station_id,
-                              )?.nom
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(stations ?? []).map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.nom}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={ligne.produit}
-                        onValueChange={(v) =>
-                          setLignesBC((l) =>
-                            l.map((li, i) =>
-                              i === idx ? { ...li, produit: v ?? "" } : li,
-                            ),
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Type de carburant...">
-                            {
-                              (typesCarburant ?? []).find(
-                                (p) => p.id === ligne.produit,
-                              )?.label
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(typesCarburant ?? []).map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        placeholder="Quantité (L)"
-                        value={ligne.quantite_commandee}
-                        onChange={(e) =>
-                          setLignesBC((l) =>
-                            l.map((li, i) =>
-                              i === idx
-                                ? { ...li, quantite_commandee: e.target.value }
-                                : li,
-                            ),
-                          )
-                        }
-                      />
-                      <Input
-                        type="number"
-                        placeholder="Prix/L (indicatif)"
-                        value={ligne.prix_unitaire}
-                        onChange={(e) =>
-                          setLignesBC((l) =>
-                            l.map((li, i) =>
-                              i === idx
-                                ? { ...li, prix_unitaire: e.target.value }
-                                : li,
-                            ),
-                          )
-                        }
-                      />
-                    </div>
+                    <LigneBCFormRow
+                      key={idx}
+                      ligne={ligne}
+                      idx={idx}
+                      dateReference={dateCommande}
+                      stations={(stations ?? []).map((s) => ({
+                        id: s.id,
+                        nom: s.nom,
+                      }))}
+                      typesCarburant={(typesCarburant ?? []).map((t) => ({
+                        id: t.id,
+                        label: t.label,
+                      }))}
+                      onChange={handleLigneBCChange}
+                    />
                   ))}
+                  {montantBCEstimatif > 0 ? (
+                    <p className="text-sm font-medium text-right pt-2 border-t">
+                      Montant estimatif BC :{" "}
+                      {formatCurrency(montantBCEstimatif)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex justify-end pt-2">
                   <Button
@@ -686,9 +724,8 @@ export function AchatCarburantPage() {
                     }
                     disabled={
                       !selectedFournisseurId ||
-                      lignesBC.every(
-                        (l) => !l.station_id || !Number(l.quantite_commandee),
-                      ) ||
+                      lignesBCValidesPourCreation.length === 0 ||
+                      lignesBCAvecPrixManquant ||
                       creerBCMutation.isPending
                     }
                   >
@@ -832,76 +869,42 @@ export function AchatCarburantPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Camion *</Label>
-                    <Select
-                      value={receptionData.camion_id}
-                      onValueChange={(v) =>
-                        setReceptionData((d) => ({ ...d, camion_id: v ?? "" }))
-                      }
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Sélectionner le camion">
-                          {(camions ?? []).find(
-                            (c) => c.id === receptionData.camion_id,
-                          )
-                            ? `${(camions ?? []).find((c) => c.id === receptionData.camion_id)?.numero_immat} — ${(camions ?? []).find((c) => c.id === receptionData.camion_id)?.capacite_totale?.toLocaleString("fr-FR")} L`
-                            : undefined}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(camions ?? []).map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.numero_immat} —{" "}
-                            {c.capacite_totale?.toLocaleString("fr-FR")} L
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Date de livraison *</Label>
-                    <Input
-                      type="date"
-                      value={receptionData.date_livraison}
-                      onChange={(e) =>
-                        setReceptionData((d) => ({
-                          ...d,
-                          date_livraison: e.target.value,
-                        }))
-                      }
-                      className="mt-1"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>N° BL / Référence livraison</Label>
-                  <Input
-                    value={receptionData.numero_bl}
-                    onChange={(e) =>
-                      setReceptionData((d) => ({
-                        ...d,
-                        numero_bl: e.target.value,
-                      }))
-                    }
-                    placeholder="Numéro du bon de livraison"
-                    className="mt-1"
-                  />
-                </div>
-                <div className="bg-muted rounded-lg p-3 text-sm">
-                  <p className="font-medium mb-1">
-                    Jauges avant/après dépotage
-                  </p>
-                  <p className="text-muted-foreground">
-                    La quantité nominale (base facturation) = Volume calculé par
-                    les jauges. La saisie détaillée des jauges par cuve se fait
-                    dans la mouventation.
-                  </p>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Compartiments = volumes nominaux livrés. Jauge avant/après =
+                  une seule fois par cuve (contrôle indicatif).
+                </p>
+                <ReceptionCarburantForm
+                  camionId={receptionCamionId}
+                  onChangeCamion={setReceptionCamionId}
+                  camions={(camions ?? []).map((c) => ({
+                    id: c.id,
+                    numero_immat: c.numero_immat,
+                    capacite_totale: c.capacite_totale,
+                  }))}
+                  dateLivraison={receptionDateLivraison}
+                  onDateLivraisonChange={setReceptionDateLivraison}
+                  numeroBl={receptionNumeroBl}
+                  onNumeroBlChange={setReceptionNumeroBl}
+                  compartiments={receptionCompartiments}
+                  onCompartimentsChange={setReceptionCompartiments}
+                  jaugesParCuve={receptionJaugesParCuve}
+                  onJaugesParCuveChange={setReceptionJaugesParCuve}
+                  stations={(stations ?? []).map((s) => ({
+                    id: s.id,
+                    nom: s.nom,
+                  }))}
+                  typesCarburant={(typesCarburant ?? []).map((t) => ({
+                    id: t.id,
+                    label: t.label,
+                  }))}
+                />
                 <Button
                   onClick={() => enregistrerReceptionMutation.mutate()}
-                  disabled={enregistrerReceptionMutation.isPending}
+                  disabled={
+                    enregistrerReceptionMutation.isPending ||
+                    !receptionCamionId ||
+                    receptionCompartiments.length === 0
+                  }
                   className="w-full"
                 >
                   {enregistrerReceptionMutation.isPending ? (
@@ -923,25 +926,21 @@ export function AchatCarburantPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-green-800 font-medium">
-                    Achat carburant enregistré !
-                  </p>
-                  <p className="text-green-700 text-sm mt-1">
-                    Retrouvez cet achat dans la liste. Vous pouvez maintenant :
-                    <br />• <strong>Mouvementer</strong> : met à jour le stock,
-                    recalcule le CMUP, met à jour les jauges
-                    <br />• <strong>Comptabiliser</strong> : génère les
-                    écritures Grand Livre (Stock ← Fournisseur, Trésorerie →
-                    Fournisseur)
-                  </p>
-                </div>
+                {detailNouvelAchat ? (
+                  <AchatBLRecap detail={detailNouvelAchat} />
+                ) : (
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                )}
+                <p className="text-sm text-muted-foreground">
+                  Depuis la liste : <strong>Mouvementer stock</strong> puis{" "}
+                  <strong>Comptabiliser</strong>. Impression BL disponible après
+                  les deux étapes.
+                </p>
                 <Button
                   className="w-full"
                   onClick={() => {
                     setActiveMainTab("liste");
-                    setNouvelAchatStep(1);
-                    setCurrentAchatId(null);
+                    resetNouvelAchat();
                   }}
                 >
                   Retour à la liste
@@ -952,25 +951,32 @@ export function AchatCarburantPage() {
         </TabsContent>
       </Tabs>
 
-      {/* APEX-16-suite : Dialog aperçu écriture comptable avant comptabilisation */}
       {previewComptaAchat && (
-        <ComptabiliserAchatDialog
+        <ComptabiliserStockAchatDialog
           open={!!previewComptaAchat}
           onOpenChange={(open) => !open && setPreviewComptaAchat(null)}
           description={`BC ${previewComptaAchat.numero_bc}${previewComptaAchat.numero_bl ? ` — BL ${previewComptaAchat.numero_bl}` : ""}${previewComptaAchat.fournisseur_nom ? ` — ${previewComptaAchat.fournisseur_nom}` : ""}`}
-          montantFacture={previewComptaAchat.montant_facture}
-          totalPaye={previewComptaAchat.total_paye}
-          libelleAchat="Achats carburant"
-          libelleTresorerie="Trésorerie (caisse/banque)"
-          libelleFournisseur={
-            previewComptaAchat.fournisseur_nom
-              ? `Fournisseur ${previewComptaAchat.fournisseur_nom}`
-              : "Fournisseur"
-          }
+          lignes={previewComptaLignes ?? []}
           onConfirm={() => comptabiliserMutation.mutate(previewComptaAchat.id)}
           isPending={comptabiliserMutation.isPending}
         />
       )}
+
+      <Dialog
+        open={!!detailAchatId}
+        onOpenChange={(open) => !open && setDetailAchatId(null)}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Détail achat carburant</DialogTitle>
+          </DialogHeader>
+          {detailAchat ? (
+            <AchatBLRecap detail={detailAchat} />
+          ) : (
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          )}
+        </DialogContent>
+      </Dialog>
     </PageContainer>
   );
 }
@@ -982,7 +988,7 @@ function AchatStatusBadge({ achat }: { achat: AchatCarburant }) {
     );
   if (achat.mouvemente)
     return <Badge className="bg-blue-600 text-white text-xs">Mouvementé</Badge>;
-  if (achat.statut === "livre")
+  if (achat.statut === "recu")
     return (
       <Badge variant="secondary" className="text-xs">
         Livré

@@ -15,7 +15,7 @@ globalThis.document = {
 } as unknown as typeof document;
 
 // On importe exportCsv après le mock
-import { exportCsv } from "@/lib/exportCsv";
+import { exportCsv, formatCsvNumber } from "@/lib/exportCsv";
 
 describe("exportCsv", () => {
   it("ne fait rien si le tableau est vide", () => {
@@ -36,5 +36,10 @@ describe("exportCsv", () => {
   it("échappe les valeurs avec des points-virgules", () => {
     const rows = [{ Description: "Vente; retour" }];
     expect(() => exportCsv(rows, "test")).not.toThrow();
+  });
+
+  it("formatCsvNumber utilise la virgule décimale", () => {
+    expect(formatCsvNumber(1234.56)).toBe("1234,56");
+    expect(formatCsvNumber(0)).toBe("0,00");
   });
 });

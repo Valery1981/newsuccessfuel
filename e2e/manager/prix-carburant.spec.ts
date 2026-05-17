@@ -39,4 +39,33 @@ test.describe("Prix Carburant — historisation §6.5", () => {
       page.getByText(/sélectionner une station/i),
     ).toBeVisible({ timeout: 10_000 });
   });
+
+  test("bouton ouvre la confirmation avant enregistrement", async ({
+    page,
+  }) => {
+    await page.goto("/manager/parametres/prix-carburant");
+    const stationTrigger = page.getByRole("combobox").first();
+    await stationTrigger.click();
+    const stationOption = page.getByRole("option").first();
+    const hasStation = await stationOption.isVisible().catch(() => false);
+    test.skip(!hasStation, "Aucune station disponible pour ce compte");
+
+    await stationOption.click();
+    await page.getByRole("combobox").nth(1).click();
+    const typeOption = page.getByRole("option").first();
+    await typeOption.click();
+
+    await page.getByLabel(/prix de vente/i).fill("750");
+    await page.getByLabel(/marge au litre/i).fill("50");
+    await page
+      .getByRole("button", { name: /enregistrer le nouveau prix/i })
+      .click();
+
+    await expect(
+      page.getByRole("alertdialog", {
+        name: /confirmer le nouveau prix carburant/i,
+      }),
+    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/historis/i).first()).toBeVisible();
+  });
 });

@@ -2,14 +2,24 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { AlertTriangle, Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { PageContainer } from "@/components/common/PageContainer";
 import { PageHeader } from "@/components/common/PageHeader";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +40,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useTypesCarburantActifs } from "@/hooks/useTypesCarburant";
+import {
+  buildPrixCarburantConfirmSummary,
+  getPrixDejaEnregistreAujourdhuiWarning,
+  hasPrixCarburantPourDate,
+  PRIX_CARBURANT_CONFIRM_WARNINGS,
+} from "@/lib/prixCarburant";
 import {
   prixCarburantService,
   type PrixCarburantRow,
@@ -73,6 +89,8 @@ export function PrixCarburantPage() {
   const entrepriseId = entreprise?.id;
   const queryClient = useQueryClient();
   const [selectedStationId, setSelectedStationId] = useState<string>("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingData, setPendingData] = useState<FormData | null>(null);
   const { data: typesCarburant } = useTypesCarburantActifs();
 
   const { data: stations } = useQuery({
@@ -128,6 +146,8 @@ export function PrixCarburantPage() {
         queryKey: ["prix-carburant", selectedStationId],
       });
       toast.success("Nouveau prix enregistré");
+      setConfirmOpen(false);
+      setPendingData(null);
       reset({
         station_id: selectedStationId,
         type_carburant_id: "",
@@ -139,6 +159,40 @@ export function PrixCarburantPage() {
   });
 
   const historiqueFiltre: PrixCarburantRow[] = historique ?? [];
+
+  const confirmSummary = useMemo(() => {
+    if (!pendingData) return null;
+    const station = (stations ?? []).find((s) => s.id === pendingData.station_id);
+    const typeLabel =
+      (typesCarburant ?? []).find((t) => t.id === pendingData.type_carburant_id)
+        ?.label ?? "—";
+    return buildPrixCarburantConfirmSummary({
+      stationNom: station?.nom ?? "—",
+      typeLabel,
+      prixVente: pendingData.prix_vente,
+      margeLitre: pendingData.marge_litre,
+    });
+  }, [pendingData, stations, typesCarburant]);
+
+  const extraWarning = useMemo(() => {
+    if (!pendingData) return null;
+    const today = new Date().toISOString().split("T")[0];
+    const hasToday = hasPrixCarburantPourDate(
+      historiqueFiltre,
+      pendingData.type_carburant_id,
+      today,
+    );
+    return getPrixDejaEnregistreAujourdhuiWarning(hasToday);
+  }, [pendingData, historiqueFiltre]);
+
+  const openConfirmDialog = (data: FormData) => {
+    setPendingData(data);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmSave = () => {
+    if (pendingData) mutation.mutate(pendingData);
+  };
 
   return (
     <PageContainer>
@@ -184,7 +238,7 @@ export function PrixCarburantPage() {
             </CardHeader>
             <CardContent>
               <form
-                onSubmit={handleSubmit((data) => mutation.mutate(data))}
+                onSubmit={handleSubmit(openConfirmDialog)}
                 className="space-y-4"
               >
                 <div className="space-y-2">
@@ -309,7 +363,7 @@ export function PrixCarburantPage() {
                       {historiqueFiltre.map((row) => (
                         <TableRow key={row.id}>
                           <TableCell className="text-xs">
-                            {formatDate(row.date_effet)}
+                            {formatDate(row.created_at ?? row.date_effet)}
                           </TableCell>
                           <TableCell className="text-xs">
                             {(typesCarburant ?? []).find(
@@ -337,6 +391,99 @@ export function PrixCarburantPage() {
           </Card>
         </div>
       )}
+
+      <AlertDialog
+        open={confirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) setPendingData(null);
+        }}
+      >
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-amber-500 shrink-0" />
+              Confirmer le nouveau prix carburant
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4 text-sm text-muted-foreground">
+                {confirmSummary && (
+                  <div className="rounded-md border bg-muted/50 p-3 space-y-2 text-foreground">
+                    <p>
+                      <span className="text-muted-foreground">Station :</span>{" "}
+                      <strong>{confirmSummary.stationNom}</strong>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">Carburant :</span>{" "}
+                      <strong>{confirmSummary.typeLabel}</strong>
+                    </p>
+                    <p>
+                      <span className="text-muted-foreground">
+                        Date d&apos;effet :
+                      </span>{" "}
+                      <strong>{confirmSummary.dateEffetLabel}</strong>
+                    </p>
+                    <div className="grid grid-cols-3 gap-2 pt-1 font-mono text-xs tabular-nums">
+                      <div>
+                        <span className="block text-muted-foreground font-sans">
+                          Prix vente
+                        </span>
+                        {formatMontant(confirmSummary.prixVente)}
+                      </div>
+                      <div>
+                        <span className="block text-muted-foreground font-sans">
+                          Marge/L
+                        </span>
+                        {formatMontant(confirmSummary.margeLitre)}
+                      </div>
+                      <div>
+                        <span className="block text-muted-foreground font-sans">
+                          Prix achat
+                        </span>
+                        {formatMontant(confirmSummary.prixAchat)}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="font-medium text-foreground mb-2">
+                    Avant de continuer, veuillez noter :
+                  </p>
+                  <ul className="list-disc pl-5 space-y-1.5">
+                    {PRIX_CARBURANT_CONFIRM_WARNINGS.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                    {extraWarning && (
+                      <li className="text-amber-600 dark:text-amber-400">
+                        {extraWarning}
+                      </li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mutation.isPending}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmSave}
+              disabled={mutation.isPending}
+            >
+              {mutation.isPending ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Enregistrement…
+                </>
+              ) : (
+                "Confirmer et enregistrer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageContainer>
   );
 }
