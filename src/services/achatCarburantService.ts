@@ -15,7 +15,6 @@ import { createClient } from "@/utils/supabase/client";
 
 const supabase = createClient();
 
-type AchatRow = Database["public"]["Tables"]["achats_carburant"]["Row"];
 type EcritureInsert = Database["public"]["Tables"]["ecritures_comptables"]["Insert"];
 type LigneEcritureInsert = Database["public"]["Tables"]["lignes_ecriture"]["Insert"];
 type ReceptionInsert = Database["public"]["Tables"]["receptions_carburant"]["Insert"];
@@ -723,7 +722,6 @@ export const achatCarburantService = {
       throw new Error("Cet achat est déjà comptabilisé");
     }
 
-    const detail = await this.getDetail(params.achatId);
     const { data: fournisseur } = await supabase
       .from("tiers")
       .select("nom, compte_principal")

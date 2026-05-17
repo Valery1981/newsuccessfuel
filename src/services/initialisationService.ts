@@ -137,7 +137,11 @@ export const initialisationService = {
     if (fetchError) throw fetchError;
 
     const kept = (existing ?? []).filter(
-      (row) => !compteRowMatchesScope(row, scope),
+      (row) =>
+        !compteRowMatchesScope(
+          { ...row, onglet: row.onglet ?? "" },
+          scope,
+        ),
     );
 
     await supabase

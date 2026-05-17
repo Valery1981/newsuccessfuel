@@ -264,30 +264,42 @@ export function CompanyInitialisationPage() {
   };
 
   /** Comptes entreprise : rechargés depuis initialisation_comptes. */
-  useEffect(() => {
-    if (!initStaging?.comptes) return;
-    const mapped = mapStagingComptesToState(initStaging.comptes);
-    setTresorerieSoldes(mapped.tresorerieSoldes);
-    setCreancesSoldes(mapped.creancesSoldes);
-    setDettesSoldes(mapped.dettesSoldes);
-    setDettesComptesSoldes(mapped.dettesComptesSoldes);
-    setImmobilisations(mapped.immobilisations);
-  }, [initStaging]);
+  const [stagingComptesRef, setStagingComptesRef] = useState(initStaging);
+  if (initStaging !== stagingComptesRef) {
+    setStagingComptesRef(initStaging);
+    if (initStaging?.comptes) {
+      const mapped = mapStagingComptesToState(initStaging.comptes);
+      setTresorerieSoldes(mapped.tresorerieSoldes);
+      setCreancesSoldes(mapped.creancesSoldes);
+      setDettesSoldes(mapped.dettesSoldes);
+      setDettesComptesSoldes(mapped.dettesComptesSoldes);
+      setImmobilisations(mapped.immobilisations);
+    }
+  }
 
   /** Données station : cuves, pistolets, stock boutique. */
-  useEffect(() => {
-    if (!initStaging || !selectedStation) return;
-    setCuveJauges(mapStagingCuvesToState(initStaging.cuves, selectedStation));
-    setPistoletIndexes(
-      mapStagingPistoletsToState(initStaging.pistolets, selectedStation),
-    );
-    const boutique = mapStagingBoutiqueToState(
-      initStaging.stocks,
-      selectedStation,
-    );
-    setBoutiqueStocks(boutique.stocks);
-    setBoutiquePrixAchat(boutique.prixAchat);
-  }, [initStaging, selectedStation]);
+  const [stagingStationRef, setStagingStationRef] = useState({
+    initStaging,
+    selectedStation,
+  });
+  if (
+    initStaging !== stagingStationRef.initStaging ||
+    selectedStation !== stagingStationRef.selectedStation
+  ) {
+    setStagingStationRef({ initStaging, selectedStation });
+    if (initStaging && selectedStation) {
+      setCuveJauges(mapStagingCuvesToState(initStaging.cuves, selectedStation));
+      setPistoletIndexes(
+        mapStagingPistoletsToState(initStaging.pistolets, selectedStation),
+      );
+      const boutique = mapStagingBoutiqueToState(
+        initStaging.stocks,
+        selectedStation,
+      );
+      setBoutiqueStocks(boutique.stocks);
+      setBoutiquePrixAchat(boutique.prixAchat);
+    }
+  }
 
   /** CMUP initial par défaut (prix carburant) uniquement si pas encore enregistré. */
   useEffect(() => {
@@ -525,9 +537,11 @@ export function CompanyInitialisationPage() {
       await initialisationService.saveInitialisationCuves(
         initialisation.id,
         selectedStation,
-        entries.map(
-          ({ compte_stock: _cs, valeur: _v, ...row }) => row,
-        ),
+        entries.map(({ compte_stock, valeur, ...row }) => {
+          void compte_stock;
+          void valeur;
+          return row;
+        }),
       );
 
       await initialisationEcrituresService.syncCuvesStock(
@@ -590,7 +604,11 @@ export function CompanyInitialisationPage() {
       await initialisationService.saveInitialisationStocksBoutique(
         initialisation.id,
         selectedStation,
-        staging.map(({ famille: _f, valeur: _v, ...row }) => row),
+        staging.map(({ famille, valeur, ...row }) => {
+          void famille;
+          void valeur;
+          return row;
+        }),
       );
 
       await initialisationEcrituresService.syncStockBoutique(

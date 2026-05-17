@@ -251,14 +251,14 @@ function CuveJaugePanel({
   const [volApres, setVolApres] = useState<number | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
 
+  const jA = Number(jauge.jauge_avant_cm);
+  const jAp = Number(jauge.jauge_apres_cm);
+  const jaugesValid = jA >= 0 && jAp >= 0;
+  const volAvantAffiche = jaugesValid ? volAvant : null;
+  const volApresAffiche = jaugesValid ? volApres : null;
+
   useEffect(() => {
-    const jA = Number(jauge.jauge_avant_cm);
-    const jAp = Number(jauge.jauge_apres_cm);
-    if (!(jA >= 0) || !(jAp >= 0)) {
-      setVolAvant(null);
-      setVolApres(null);
-      return;
-    }
+    if (!jaugesValid) return;
     let cancelled = false;
     (async () => {
       try {
@@ -276,11 +276,11 @@ function CuveJaugePanel({
     return () => {
       cancelled = true;
     };
-  }, [cuveId, jauge.jauge_avant_cm, jauge.jauge_apres_cm]);
+  }, [cuveId, jauge.jauge_avant_cm, jauge.jauge_apres_cm, jaugesValid, jA, jAp]);
 
   const controle =
-    volAvant != null && volApres != null && totalNominal > 0
-      ? calculerControleJaugeCuve(volAvant, volApres, totalNominal)
+    volAvantAffiche != null && volApresAffiche != null && totalNominal > 0
+      ? calculerControleJaugeCuve(volAvantAffiche, volApresAffiche, totalNominal)
       : null;
 
   return (
@@ -324,13 +324,13 @@ function CuveJaugePanel({
         <div>
           <Label className="text-xs">Vol. avant</Label>
           <p className="mt-1.5 text-sm font-medium">
-            {volAvant != null ? `${formatNumber(volAvant, 1)} L` : "—"}
+            {volAvantAffiche != null ? `${formatNumber(volAvantAffiche, 1)} L` : "—"}
           </p>
         </div>
         <div>
           <Label className="text-xs">Vol. après</Label>
           <p className="mt-1.5 text-sm font-medium">
-            {volApres != null ? `${formatNumber(volApres, 1)} L` : "—"}
+            {volApresAffiche != null ? `${formatNumber(volApresAffiche, 1)} L` : "—"}
           </p>
         </div>
       </div>
@@ -406,8 +406,7 @@ export function ReceptionCarburantForm({
       onJaugesParCuveChange({
         ...jaugesParCuve,
         [cuveId]: {
-          jauge_avant_cm: "",
-          jauge_apres_cm: "",
+          ...{ jauge_avant_cm: "", jauge_apres_cm: "" },
           ...jaugesParCuve[cuveId],
           ...patch,
         },

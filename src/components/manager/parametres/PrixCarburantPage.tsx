@@ -46,10 +46,7 @@ import {
   hasPrixCarburantPourDate,
   PRIX_CARBURANT_CONFIRM_WARNINGS,
 } from "@/lib/prixCarburant";
-import {
-  prixCarburantService,
-  type PrixCarburantRow,
-} from "@/services/prixCarburantService";
+import { prixCarburantService } from "@/services/prixCarburantService";
 import { stationService } from "@/services/stationService";
 import { useAuthStore } from "@/stores/authStore";
 
@@ -158,7 +155,10 @@ export function PrixCarburantPage() {
     onError: (err) => toast.error(err.message),
   });
 
-  const historiqueFiltre: PrixCarburantRow[] = historique ?? [];
+  const historiqueFiltre = useMemo(
+    () => historique ?? [],
+    [historique],
+  );
 
   const confirmSummary = useMemo(() => {
     if (!pendingData) return null;
@@ -405,8 +405,10 @@ export function PrixCarburantPage() {
               <AlertTriangle className="size-5 text-amber-500 shrink-0" />
               Confirmer le nouveau prix carburant
             </AlertDialogTitle>
-            <AlertDialogDescription asChild>
-              <div className="space-y-4 text-sm text-muted-foreground">
+            <AlertDialogDescription>
+              Vérifiez le récapitulatif avant d&apos;enregistrer le nouveau prix.
+            </AlertDialogDescription>
+            <div className="space-y-4 text-sm text-muted-foreground">
                 {confirmSummary && (
                   <div className="rounded-md border bg-muted/50 p-3 space-y-2 text-foreground">
                     <p>
@@ -461,8 +463,7 @@ export function PrixCarburantPage() {
                     )}
                   </ul>
                 </div>
-              </div>
-            </AlertDialogDescription>
+            </div>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={mutation.isPending}>

@@ -1302,6 +1302,7 @@ export type Database = {
         Row: {
           capital_net_calcule: number | null;
           created_at: string | null;
+          date_ouverture: string | null;
           entreprise_id: string | null;
           est_validee: boolean | null;
           id: string;
@@ -1312,6 +1313,7 @@ export type Database = {
         Insert: {
           capital_net_calcule?: number | null;
           created_at?: string | null;
+          date_ouverture?: string | null;
           entreprise_id?: string | null;
           est_validee?: boolean | null;
           id?: string;
@@ -1322,6 +1324,7 @@ export type Database = {
         Update: {
           capital_net_calcule?: number | null;
           created_at?: string | null;
+          date_ouverture?: string | null;
           entreprise_id?: string | null;
           est_validee?: boolean | null;
           id?: string;
@@ -4350,6 +4353,64 @@ export type Database = {
       verifier_partie_double: {
         Args: { p_ecriture_id: string };
         Returns: boolean;
+      };
+      rebuild_initialisation_ouverture_globale: {
+        Args: {
+          p_initialisation_id: string;
+          p_entreprise_id: string;
+          p_date_ouverture: string;
+          p_created_by: string | null;
+        };
+        Returns: number;
+      };
+      sync_initialisation_a_nouveau: {
+        Args: {
+          p_initialisation_id: string;
+          p_entreprise_id: string;
+          p_module: string;
+          p_station_id: string | null;
+          p_date_ouverture: string;
+          p_created_by: string | null;
+          p_lignes: Json;
+        };
+        Returns: number;
+      };
+      get_initialisation_bilan_ouverture: {
+        Args: { p_initialisation_id: string };
+        Returns: Json;
+      };
+      sync_initialisation_stock_boutique: {
+        Args: {
+          p_initialisation_id: string;
+          p_station_id: string;
+          p_entreprise_id: string;
+          p_created_by: string | null;
+        };
+        Returns: number;
+      };
+      sync_initialisation_cuves_stock: {
+        Args: {
+          p_initialisation_id: string;
+          p_station_id: string;
+          p_entreprise_id: string;
+        };
+        Returns: number;
+      };
+      sync_initialisation_index_pistolets: {
+        Args: {
+          p_initialisation_id: string;
+          p_station_id: string;
+          p_entreprise_id: string;
+        };
+        Returns: number;
+      };
+      valider_initialisation_lock: {
+        Args: {
+          p_initialisation_id: string;
+          p_entreprise_id: string;
+          p_compte_id: string;
+        };
+        Returns: Json;
       };
     };
     Enums: {

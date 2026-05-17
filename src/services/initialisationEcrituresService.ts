@@ -1,4 +1,5 @@
 import type { InitialisationLigneANouveau, InitialisationModule } from "@/lib/initialisationCompta";
+import type { Json } from "@/types/supabase";
 import { validateLignesInitialisation } from "@/lib/initialisationCompta";
 import { assertModuleStationScope } from "@/lib/initialisationScope";
 import { createClient } from "@/utils/supabase/client";
@@ -75,7 +76,7 @@ export const initialisationEcrituresService = {
       p_station_id: params.stationId,
       p_date_ouverture: params.dateOuverture,
       p_created_by: params.createdBy,
-      p_lignes: params.lignes,
+      p_lignes: params.lignes as unknown as Json,
     });
     if (error) throw error;
     return (data as number) ?? 0;
